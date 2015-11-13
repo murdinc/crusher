@@ -74,6 +74,16 @@ func main() {
 				cfg.DeleteServer()
 			},
 		},
+		{
+			Name:        "available-specs",
+			ShortName:   "s",
+			Example:     "crusher available-specs",
+			Description: "List all available specs",
+			Action: func(c *cli.Context) {
+				cli.Information(fmt.Sprintf("There are [%d] specs available currently", len(cfg.SpecList.Specs)))
+				cfg.SpecList.PrintAllSpecs()
+			},
+		},
 	}
 
 	app.Run(os.Args)
