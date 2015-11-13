@@ -27,23 +27,23 @@ func ReadConfig() (*CrusherConfig, error) {
 		return config, err
 	}
 
-	targets := cfg.Sections()
+	remotes := cfg.Sections()
 
-	for _, target := range targets {
+	for _, remote := range remotes {
 
 		// We dont want the default right now
-		if target.Name() == "DEFAULT" {
+		if remote.Name() == "DEFAULT" {
 			continue
 		}
 
 		server := new(servers.Server)
 
-		err := target.MapTo(server)
+		err := remote.MapTo(server)
 		if err != nil {
 			return config, err
 		}
 
-		server.Nickname = target.Name()
+		server.Name = remote.Name()
 		config.Servers = append(config.Servers, *server)
 	}
 
@@ -74,8 +74,13 @@ func (c *CrusherConfig) SaveConfig() error {
 	cfg := ini.Empty()
 
 	for _, server := range c.Servers {
-		err := cfg.Section(server.Nickname).ReflectFrom(&server)
-		fmt.Sprintf("ERROR: %s", err)
+		err := cfg.Section(server.Name).ReflectFrom(&server)
+		if err != nil {
+			return err
+		}
+
+		// Hack to get bools to play nice, and not just output "<bool Value>" - I'll probably open a pull request once I track down the issue.
+		cfg.Section(server.Name).NewKey("PassAuth", fmt.Sprintf("%t", server.PassAuth))
 	}
 
 	err := cfg.SaveToIndent(configLocation, "\t")
@@ -89,14 +94,14 @@ func (c *CrusherConfig) SaveConfig() error {
 // Delete a specific server from the config file
 func (c *CrusherConfig) DeleteServer() {
 	count := len(c.Servers)
-	cli.Information(fmt.Sprintf("There are [%d] target servers configured currently", count))
+	cli.Information(fmt.Sprintf("There are [%d] servers configured currently", count))
 	c.Servers.PrintAllServerInfo()
 
-	index := cli.PromptInt("Which target server would you like to delete from the config?", count) - 1
+	index := cli.PromptInt("Which server would you like to delete from the config?", count) - 1
 
 	c.Servers[index].PrintServerInfo()
 
-	sure := cli.PromptBool("Are you sure you want to delete this target server?")
+	sure := cli.PromptBool("Are you sure you want to delete this server?")
 	if sure {
 		c.Servers, c.Servers[len(c.Servers)-1] = append(c.Servers[:index], c.Servers[index+1:]...), servers.Server{}
 		c.SaveConfig()
@@ -106,12 +111,13 @@ func (c *CrusherConfig) DeleteServer() {
 
 // Input flow for interactive server setup
 func (c *CrusherConfig) addServerDialog() {
-	nickname := cli.PromptString("What would you like to nickname this server?")
-	host := cli.PromptString(fmt.Sprintf("What is the Hostname or IP of [%s]?", nickname))
-	username := cli.PromptString(fmt.Sprintf("What Username would you like to use to connect to [%s]?", nickname))
-	class := cli.PromptString(fmt.Sprintf("What Class of server is [%s]?", nickname))
+	name := cli.PromptString("What would you like to name this server?")
+	host := cli.PromptString(fmt.Sprintf("What is the Hostname or IP of [%s]?", name))
+	username := cli.PromptString(fmt.Sprintf("What Username would you like to use to connect to [%s]?", name))
+	spec := cli.PromptString(fmt.Sprintf("What Spec would you like to assign to [%s]?", name))
+	passAuth := cli.PromptBool(fmt.Sprintf("Does [%s] require password authentication?", name))
 
-	server := servers.New(nickname, host, username, class)
+	server := servers.New(name, host, username, spec, passAuth)
 	server.PrintServerInfo()
 
 	correct := cli.PromptBool("Great! Does that look correct?")

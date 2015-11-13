@@ -37,30 +37,30 @@ func main() {
 			Name:        "list-servers",
 			ShortName:   "l",
 			Example:     "crusher list-servers",
-			Description: "List all configured target servers",
+			Description: "List all configured remote servers",
 			Action: func(c *cli.Context) {
-				cli.Information(fmt.Sprintf("There are [%d] target servers configured currently", len(cfg.Servers)))
+				cli.Information(fmt.Sprintf("There are [%d] remote servers configured currently", len(cfg.Servers)))
 				cfg.Servers.PrintAllServerInfo()
 
 			},
 		},
 		{
-			Name:        "configure",
-			ShortName:   "c",
-			Example:     "crusher configure [class]",
-			Description: "Configure a target class of servers",
+			Name:        "remote-configure",
+			ShortName:   "rc",
+			Example:     "crusher remote-configure web",
+			Description: "Configure all remote servers of a specified spec",
 			Arguments: []cli.Argument{
-				cli.Argument{Name: "class", Description: "The class of target servers to configure", Optional: false},
+				cli.Argument{Name: "spec", Description: "The spec group of remote servers to configure", Optional: false},
 			},
 			Action: func(c *cli.Context) {
-				cfg.Servers.Configure(c.NamedArg("class"))
+				cfg.Servers.RemoteConfigure(c.NamedArg("spec"))
 			},
 		},
 		{
 			Name:        "add-server",
 			ShortName:   "a",
 			Example:     "crusher add-server",
-			Description: "Add a new target server for remote configuration",
+			Description: "Add a new remote server to the config",
 			Action: func(c *cli.Context) {
 				cfg.AddServer()
 			},
@@ -69,7 +69,7 @@ func main() {
 			Name:        "delete-server",
 			ShortName:   "d",
 			Example:     "crusher delete-server",
-			Description: "Delete a target server from the list of configured servers",
+			Description: "Delete a remote server from the config",
 			Action: func(c *cli.Context) {
 				cfg.DeleteServer()
 			},
