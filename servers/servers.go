@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/murdinc/cli"
-	"github.com/murdinc/crusher/commands"
+	"github.com/murdinc/crusher/specr"
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 )
@@ -34,10 +34,11 @@ type RemoteJob struct {
 	Server    Server
 	SSHConf   *ssh.ClientConfig
 	Timeout   time.Duration
-	Commands  commands.Commands
 	Responses chan string
 	Errors    chan error
 	WaitGroup *sync.WaitGroup
+	SpecList  *specr.SpecList
+	SpecName  string
 }
 
 // Assembles a new Server struct
@@ -72,6 +73,7 @@ func (s *Server) PrintServerInfo() {
 	printTable(collumns, rows)
 }
 
+// Read function with timeout
 func (r *RemoteJob) Read(b []byte) (int, error) {
 	err := r.Conn.SetReadDeadline(time.Now().Add(r.Timeout))
 	if err != nil {
@@ -80,6 +82,7 @@ func (r *RemoteJob) Read(b []byte) (int, error) {
 	return r.Conn.Read(b)
 }
 
+// Write function with timeout
 func (r *RemoteJob) Write(b []byte) (int, error) {
 	err := r.Conn.SetWriteDeadline(time.Now().Add(r.Timeout))
 	if err != nil {
@@ -89,10 +92,10 @@ func (r *RemoteJob) Write(b []byte) (int, error) {
 }
 
 // Run Remote Configuration on a target spec group
-func (s Servers) RemoteConfigure(spec string) {
+func (s Servers) RemoteConfigure(specName string, specList *specr.SpecList) {
 
 	// Get our list of targets
-	targetGroup := s.getTargetGroup(spec)
+	targetGroup := s.getTargetGroup(specName)
 
 	configure := cli.PromptBool("Do you want to configure these servers?")
 
@@ -100,10 +103,6 @@ func (s Servers) RemoteConfigure(spec string) {
 		cli.Information("Okay, maybe next time..")
 		os.Exit(0)
 	}
-
-	// TODO check if spec exists..
-	// spec, err = GetSpec(spec)
-	// commands := spec.Commands()
 
 	// Get passwords for hosts that need them
 	for i, server := range targetGroup {
@@ -143,8 +142,11 @@ func (s Servers) RemoteConfigure(spec string) {
 			Errors:    errors,
 			Timeout:   timeout,
 			SSHConf:   sshConf,
-			WaitGroup: &wg}
+			WaitGroup: &wg,
+			SpecList:  specList,
+			SpecName:  specName}
 
+		// Launch it!
 		go job.Run()
 
 	}
@@ -153,10 +155,10 @@ func (s Servers) RemoteConfigure(spec string) {
 	go func() {
 		for {
 			select {
-			case err := <-errors:
-				printErr(err.Error())
 			case resp := <-responses:
 				printResp(resp)
+			case err := <-errors:
+				printErr(err.Error())
 			}
 		}
 	}()
@@ -181,72 +183,87 @@ func printErr(msg string) {
 // Runs the remote Jobs and returns results on the job channels
 func (job *RemoteJob) Run() {
 
-	defer job.WaitGroup.Done()
+	// Setup
+	////////////////..........
 
+	defer job.WaitGroup.Done()
 	header := addSpaces(fmt.Sprintf("[%s - %s]", job.Server.Name, job.Server.Host), 35)
 
-	// Open a connection with a timeout
+	// Open a tcp connection with a timeout
 	conn, err := net.DialTimeout("tcp", job.Server.Host+":22", job.Timeout)
 
 	if err != nil {
 		job.Errors <- fmt.Errorf("%s DialTimeout Failed: %s", header, err)
 		return
 	}
+	job.Conn = conn // so that it gets wrapped with our timeout funcs
 
-	job.Conn = conn
-
-	//
+	// Get an ssh client
 	c, chans, reqs, err := ssh.NewClientConn(job.Conn, job.Server.Host, job.SSHConf)
 	if err != nil {
 		job.Errors <- fmt.Errorf("%s NewClientConn Failed: %s", header, err)
 		return
 	}
 	client := ssh.NewClient(c, chans, reqs)
+	defer client.Close()
 
-	// ##################################################################################################################
+	// Actual Work
+	////////////////..........
 
-	// open an SFTP session over an existing ssh connection.
-	sftp, err := sftp.NewClient(client)
+	// Run Apt-Get Commands
+	aptCmd := job.SpecList.AptGetCmd(job.SpecName)
+	job.Responses <- fmt.Sprintf("%s Running apt-get Command... \n		Command: [%s]\n", header, aptCmd)
+	_, err = runCommand(client, aptCmd)
 	if err != nil {
-		job.Errors <- fmt.Errorf("%s SFTP NewClient Failed: %s", header, err)
-		return
-	}
-	defer sftp.Close()
-
-	// walk a directory
-	w := sftp.Walk("/home/ubuntu/")
-	for w.Step() {
-		if w.Err() != nil {
-			job.Errors <- fmt.Errorf("%s SFTP NewClient Failed: %s", header, w.Err())
-			continue
-		}
-		job.Responses <- fmt.Sprintf("%s Response: %s", header, w.Path())
-		//log.Println(w.Path())
+		job.Errors <- fmt.Errorf("%s apt-get Command Failed! \n		Command: [%s]\n		Error: %s", header, aptCmd, err)
+	} else {
+		job.Responses <- fmt.Sprintf("%s apt-get Command Finished!", header) // TODO verbose output resp?
 	}
 
-	// ##################################################################################################################
+	// Transfer any files we need to transfer
+	fileList := job.SpecList.DebianFileTransferList(job.SpecName)
+	_, err = transferFiles(client, fileList)
 
+	// Run post configure commands
+	postCmd := job.SpecList.PostCmd(job.SpecName)
+	job.Responses <- fmt.Sprintf("%s Running Post Configuration Command... \n		Command: [%s]\n", header, aptCmd)
+	_, err = runCommand(client, postCmd)
+	if err != nil {
+		job.Errors <- fmt.Errorf("%s Post Configure Command Failed! \n		Command: [%s]\n		Error: %s", header, postCmd, err)
+	} else {
+		job.Responses <- fmt.Sprintf("%s Post Configure Command Finished!", header)
+	}
+
+	// End of the line
+}
+
+func runCommand(client *ssh.Client, cmd string) (string, error) {
+	// Open an ssh session
 	session, err := client.NewSession()
 	if err != nil {
-		job.Errors <- fmt.Errorf("%s NewSession Failed: %s", header, err)
-		return
+		return "", err
 	}
-
 	defer session.Close()
 
 	var stdoutBuf bytes.Buffer
 	session.Stdout = &stdoutBuf
 
-	// Command Looper™
-	cmd := "uptime"
 	err = session.Run(cmd)
+
+	return stdoutBuf.String(), err
+
+}
+
+func transferFiles(client *ssh.Client, fileList *specr.FileTransfers) (string, error) {
+	// open an sftp session.
+	sftp, err := sftp.NewClient(client)
 	if err != nil {
-		job.Errors <- fmt.Errorf("%s Command Failed! Command: %s Response: %s", header, cmd, err)
+		return "", err
 	}
+	defer sftp.Close()
 
-	job.Responses <- fmt.Sprintf("%s Response: %s", header, stdoutBuf.String())
+	return "", nil
 
-	// End of the line
 }
 
 // Prints all server config data in a table

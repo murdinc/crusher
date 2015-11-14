@@ -6,14 +6,12 @@ import (
 
 	"github.com/murdinc/cli"
 	"github.com/murdinc/crusher/servers"
-	"github.com/murdinc/crusher/specr"
 
 	"gopkg.in/ini.v1"
 )
 
 type CrusherConfig struct {
-	Servers  servers.Servers
-	SpecList *specr.SpecList
+	Servers servers.Servers
 }
 
 // Reads in the config and returns a CrusherConfig struct
@@ -48,13 +46,6 @@ func ReadConfig() (*CrusherConfig, error) {
 		server.Name = remote.Name()
 		config.Servers = append(config.Servers, *server)
 	}
-
-	specList, err := specr.GetSpecs()
-	if err != nil {
-		return config, err
-	}
-
-	config.SpecList = specList
 
 	return config, err
 }

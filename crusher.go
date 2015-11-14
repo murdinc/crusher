@@ -6,6 +6,7 @@ import (
 
 	"github.com/murdinc/cli"
 	"github.com/murdinc/crusher/config"
+	"github.com/murdinc/crusher/specr"
 )
 
 // Main Function
@@ -53,7 +54,19 @@ func main() {
 				cli.Argument{Name: "spec", Description: "The spec group of remote servers to configure", Optional: false},
 			},
 			Action: func(c *cli.Context) {
-				cfg.Servers.RemoteConfigure(c.NamedArg("spec"))
+				specList, err := specr.GetSpecs()
+				if err != nil {
+					cli.ShowErrorMessage("Error Reading Spec Files!", err.Error())
+					return
+				}
+
+				specName := c.NamedArg("spec")
+				if !specList.SpecExists(specName) {
+					cli.ShowErrorMessage("Unable to find Spec!", fmt.Sprintf("I was unable to find a spec named [%s].", specName))
+					return
+				}
+
+				cfg.Servers.RemoteConfigure(specName, specList)
 			},
 		},
 		{
@@ -80,8 +93,36 @@ func main() {
 			Example:     "crusher available-specs",
 			Description: "List all available specs",
 			Action: func(c *cli.Context) {
-				cli.Information(fmt.Sprintf("There are [%d] specs available currently", len(cfg.SpecList.Specs)))
-				cfg.SpecList.PrintAllSpecs()
+				specList, err := specr.GetSpecs()
+				if err != nil {
+					cli.ShowErrorMessage("Error Reading Spec Files!", err.Error())
+				}
+
+				cli.Information(fmt.Sprintf("There are [%d] specs available currently", len(specList.Specs)))
+				specList.PrintSpecTable()
+			},
+		},
+		{
+			Name:        "show-spec",
+			ShortName:   "ss",
+			Example:     "crusher show-spec",
+			Description: "Show what a given spec will build",
+			Arguments: []cli.Argument{
+				cli.Argument{Name: "spec", Description: "The spec to show", Optional: false},
+			},
+			Action: func(c *cli.Context) {
+				specList, err := specr.GetSpecs()
+				if err != nil {
+					cli.ShowErrorMessage("Error Reading Spec Files!", err.Error())
+				}
+
+				specName := c.NamedArg("spec")
+				if !specList.SpecExists(specName) {
+					cli.ShowErrorMessage("Unable to find Spec!", fmt.Sprintf("I was unable to find a spec named [%s].", specName))
+					return
+				}
+
+				specList.ShowSpec(c.NamedArg("spec"))
 			},
 		},
 	}
@@ -91,19 +132,3 @@ func main() {
 
 //
 ////////////////..........
-
-func log(kind string, err error) {
-	if err == nil {
-		fmt.Printf("%s\n", kind)
-	} else {
-		cli.ShowErrorMessage(kind, fmt.Sprintf("Details: %s", err))
-		//os.Exit(1)
-		//fmt.Printf("[ERROR - %s]: %s\n", kind, err)
-	}
-}
-
-func prompt(string) string {
-
-	return ""
-
-}

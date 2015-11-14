@@ -7,10 +7,10 @@ VERSION = 1
 REQUIRES = ""
 
 [PACKAGES]
-	apt_get = php5
+	apt_get = php5-fpm
 
 [CONFIGS]
-	debian_root = "/etc/php5/"
+	debian_root = "/etc/"
 
 [COMMANDS]
 	# NONE

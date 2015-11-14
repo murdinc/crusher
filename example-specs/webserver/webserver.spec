@@ -10,13 +10,13 @@ REQUIRES = nginx, php
 	# NONE
 
 [CONFIGS]
-	# NONE
+	debian_root = "/etc/"
 
 [CONTENT]
 	source = spec
 	# source = git
 	# git_command = git clone ...
-	debian_root = "/var/lib/html/"
+	debian_root = "/usr/share/nginx/html/"
 
 [COMMANDS]
 	post = "sudo service nginx reload"

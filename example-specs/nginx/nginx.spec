@@ -10,7 +10,7 @@ REQUIRES = ""
 	apt_get = nginx
 
 [CONFIGS]
-	debian_root = "/etc/nginx/"
+	debian_root = "/etc/"
 
 [COMMANDS]
 	# NONE
