@@ -4,11 +4,11 @@ server {
         listen 80 default_server;
         listen [::]:80 default_server ipv6only=on;
 
-        root /usr/share/nginx/html;
-        index index.html index.htm;
+        root /usr/share/nginx/html/hello_world;
+        index index.php;
 
         # Make site accessible from http://localhost/
-        server_name localhost;
+        # server_name localhost;
 
         location / {
                 # First attempt to serve request as file, then
@@ -18,3 +18,15 @@ server {
                 # include /etc/nginx/naxsi.rules
         }
 
+        location ~ [^/]\.php(/|$) {
+                fastcgi_split_path_info ^(.+?\.php)(/.*)$;
+                if (!-f $document_root$fastcgi_script_name) {
+                        return 404;
+                }
+
+                fastcgi_pass unix:/var/run/php5-fpm.sock;
+                fastcgi_index index.php;
+                include fastcgi_params;
+        }
+
+}

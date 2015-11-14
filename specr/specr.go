@@ -53,6 +53,7 @@ type Commands struct {
 type FileTransfer struct {
 	Source      string
 	Destination string
+	Folder      string
 	Chown       string
 	Chmod       string
 }
@@ -161,7 +162,7 @@ func (s *SpecList) getDebianFileTransfers(specName string) *FileTransfers {
 
 	files := new(FileTransfers)
 
-	// Configs
+	// Spec Configs
 	////////////////..........
 	srcConfFolder := spec.SpecRoot + "/configs/"
 	destConfFolder := spec.Configs.DebianRoot
@@ -170,9 +171,11 @@ func (s *SpecList) getDebianFileTransfers(specName string) *FileTransfers {
 		// Walk the Configs folder and append each file
 		walkFn := func(path string, fileInfo os.FileInfo, inErr error) (err error) {
 			if inErr == nil && !fileInfo.IsDir() {
+				destination := destConfFolder + strings.TrimPrefix(path, srcConfFolder)
 				files.add(FileTransfer{
 					Source:      path,
-					Destination: destConfFolder + strings.TrimPrefix(path, srcConfFolder),
+					Destination: destination,
+					Folder:      filepath.Dir(destination),
 				})
 			}
 			return
@@ -189,9 +192,11 @@ func (s *SpecList) getDebianFileTransfers(specName string) *FileTransfers {
 		// Walk the Configs folder and append each file
 		walkFn := func(path string, fileInfo os.FileInfo, inErr error) (err error) {
 			if inErr == nil && !fileInfo.IsDir() {
+				destination := destContentFolder + strings.TrimPrefix(path, srcContentFolder)
 				files.add(FileTransfer{
 					Source:      path,
-					Destination: destContentFolder + strings.TrimPrefix(path, srcContentFolder),
+					Destination: destination,
+					Folder:      filepath.Dir(destination),
 				})
 			}
 			return
@@ -199,7 +204,7 @@ func (s *SpecList) getDebianFileTransfers(specName string) *FileTransfers {
 		filepath.Walk(srcContentFolder, walkFn)
 	}
 
-	// Recursive Spec Requirements
+	// Requirement Spec File List
 	////////////////..........
 	for _, reqSpec := range spec.Requires {
 		recFiles := s.getDebianFileTransfers(reqSpec)
@@ -220,7 +225,7 @@ func (s *SpecList) ShowSpec(specName string) {
 	fileList := s.DebianFileTransferList(specName)
 
 	for i, file := range *fileList {
-		fmt.Printf("#%d - \n		Source: %s \n		Destination: %s\n\n", i+1, file.Source, file.Destination)
+		fmt.Printf("#%d - \n		Source: %s \n		Destination: %s\n		Folder: %s\n\n", i+1, file.Source, file.Destination, file.Folder)
 	}
 
 	cli.Information(fmt.Sprintf("[POST CONFIGURE COMMAND] >$ %s", s.PostCmd(specName)))
@@ -231,7 +236,7 @@ func (s *SpecList) ShowSpec(specName string) {
 func (s *SpecList) PrintSpecTable() {
 
 	// Build the table elements
-	collumns := []string{"Spec Name", "Version", "Requires", "Apt Packages", "Debian Config Root", "Content Source", "Content Debian Root", "Post Commands", "Spec File"}
+	collumns := []string{"Spec Name", "Version", "Requires", "Apt Packages", "Debian Config Root", "Content Source", "Debian Content Root", "Post Commands", "Spec File"}
 
 	var rows [][]string
 

@@ -39,6 +39,7 @@ type RemoteJob struct {
 	WaitGroup *sync.WaitGroup
 	SpecList  *specr.SpecList
 	SpecName  string
+	Client    *ssh.Client
 }
 
 // Assembles a new Server struct
@@ -169,13 +170,13 @@ func (s Servers) RemoteConfigure(specName string, specList *specr.SpecList) {
 }
 
 func printResp(msg string) {
-	template := `{{ ansi "fggreen"}}✓  {{ . }}{{ansi ""}}
+	template := `{{ ansi "fggreen"}}{{ . }}{{ansi ""}}
 	`
 	cli.PrintAnsi(template, msg)
 }
 
 func printErr(msg string) {
-	template := `{{ ansi "fgred"}}X  {{ . }}{{ansi ""}}
+	template := `{{ ansi "fgred"}}{{ . }}{{ansi ""}}
 	`
 	cli.PrintAnsi(template, msg)
 }
@@ -183,65 +184,85 @@ func printErr(msg string) {
 // Runs the remote Jobs and returns results on the job channels
 func (job *RemoteJob) Run() {
 
+	line := addSpaces("[%s] ["+job.Server.Name+" - "+job.Server.Host+"]", 45) + " >> %s " // status, name, host, message
+
 	// Setup
 	////////////////..........
 
 	defer job.WaitGroup.Done()
-	header := addSpaces(fmt.Sprintf("[%s - %s]", job.Server.Name, job.Server.Host), 35)
 
 	// Open a tcp connection with a timeout
+	job.Responses <- fmt.Sprintf(line, " ", "Opening a new TCP connection...")
 	conn, err := net.DialTimeout("tcp", job.Server.Host+":22", job.Timeout)
 
 	if err != nil {
-		job.Errors <- fmt.Errorf("%s DialTimeout Failed: %s", header, err)
+		job.Errors <- fmt.Errorf(line, "X", "Unable to open TCP connection! Aborting futher tasks for this server..")
 		return
 	}
 	job.Conn = conn // so that it gets wrapped with our timeout funcs
+	job.Responses <- fmt.Sprintf(line, "✓", "TCP connection Opened!")
 
 	// Get an ssh client
+	job.Responses <- fmt.Sprintf(line, " ", "Creating new ssh client...")
 	c, chans, reqs, err := ssh.NewClientConn(job.Conn, job.Server.Host, job.SSHConf)
 	if err != nil {
-		job.Errors <- fmt.Errorf("%s NewClientConn Failed: %s", header, err)
+		job.Errors <- fmt.Errorf(line, "X", "Unable to create SSH client! Aborting futher tasks for this server..")
 		return
 	}
-	client := ssh.NewClient(c, chans, reqs)
-	defer client.Close()
+	job.Client = ssh.NewClient(c, chans, reqs)
+	defer job.Client.Close()
+	job.Responses <- fmt.Sprintf(line, "✓", "SSH client creation Succeeded!")
+
+	// Elevate permissions
+	job.Responses <- fmt.Sprintf(line, " ", "Attempting to elevate permissions...")
+	err = job.runCommand("sudo uname", "sudo uname")
+	if err != nil {
+		job.Errors <- fmt.Errorf(line, "X", "Permission Elevation Failed! Aborting futher tasks for this server..")
+		return
+	}
+	job.Responses <- fmt.Sprintf(line, "✓", "Permission Elevation Succeeded!")
 
 	// Actual Work
 	////////////////..........
 
 	// Run Apt-Get Commands
 	aptCmd := job.SpecList.AptGetCmd(job.SpecName)
-	job.Responses <- fmt.Sprintf("%s Running apt-get Command... \n		Command: [%s]\n", header, aptCmd)
-	_, err = runCommand(client, aptCmd)
+	job.Responses <- fmt.Sprintf(line, " ", "Running apt-get Command...")
+	err = job.runCommand(aptCmd, "apt-get")
 	if err != nil {
-		job.Errors <- fmt.Errorf("%s apt-get Command Failed! \n		Command: [%s]\n		Error: %s", header, aptCmd, err)
-	} else {
-		job.Responses <- fmt.Sprintf("%s apt-get Command Finished!", header) // TODO verbose output resp?
+		job.Errors <- fmt.Errorf(line, "X", "Command apt-get Failed! Aborting futher tasks for this server..")
+		return
 	}
+	job.Responses <- fmt.Sprintf(line, "✓", "Command apt-get Succeeded!")
 
 	// Transfer any files we need to transfer
 	fileList := job.SpecList.DebianFileTransferList(job.SpecName)
-	_, err = transferFiles(client, fileList)
+	job.Responses <- fmt.Sprintf(line, " ", "Starting remote file transfer...")
+	err = job.transferFiles(fileList, "Configuration and Content Files")
+	if err != nil {
+		job.Errors <- fmt.Errorf(line, "X", "File Transfer Failed! Aborting futher tasks for this server..")
+		return
+	}
+	job.Responses <- fmt.Sprintf(line, "✓", "File Transfer Succeeded!")
 
 	// Run post configure commands
 	postCmd := job.SpecList.PostCmd(job.SpecName)
-	job.Responses <- fmt.Sprintf("%s Running Post Configuration Command... \n		Command: [%s]\n", header, aptCmd)
-	_, err = runCommand(client, postCmd)
+	job.Responses <- fmt.Sprintf(line, " ", "Running Post-Configuration Command...")
+	err = job.runCommand(postCmd, "Post-Configuration")
 	if err != nil {
-		job.Errors <- fmt.Errorf("%s Post Configure Command Failed! \n		Command: [%s]\n		Error: %s", header, postCmd, err)
-	} else {
-		job.Responses <- fmt.Sprintf("%s Post Configure Command Finished!", header)
+		job.Errors <- fmt.Errorf(line, "X", "Post-Configuration Command Failed!")
 	}
+	job.Responses <- fmt.Sprintf(line, "✓", "Post-Configuration Command Succeeded!")
 
 	// End of the line
 }
 
-func runCommand(client *ssh.Client, cmd string) (string, error) {
+func (j *RemoteJob) runCommand(cmd string, name string) error {
+
 	// Open an ssh session
-	session, err := client.NewSession()
+	session, err := j.Client.NewSession()
 	if err != nil {
-		return "", err
+		return err
 	}
 	defer session.Close()
 
@@ -250,19 +271,83 @@ func runCommand(client *ssh.Client, cmd string) (string, error) {
 
 	err = session.Run(cmd)
 
-	return stdoutBuf.String(), err
+	// j.Responses <- stdoutBuf.String() // TODO handle more verbose output, maybe from a verbose cli flag
+
+	return err
 
 }
 
-func transferFiles(client *ssh.Client, fileList *specr.FileTransfers) (string, error) {
-	// open an sftp session.
-	sftp, err := sftp.NewClient(client)
-	if err != nil {
-		return "", err
-	}
-	defer sftp.Close()
+func (j *RemoteJob) transferFiles(fileList *specr.FileTransfers, name string) error {
 
-	return "", nil
+	line := addSpaces("[%s] ["+j.Server.Name+" - "+j.Server.Host+"]", 45) + " >> %s " // status, name, host, message
+
+	// open an sftp session.
+	sftpClient, err := sftp.NewClient(j.Client)
+	if err != nil {
+		return err
+	}
+	defer sftpClient.Close()
+
+	// Defer cleanup
+	defer j.runCommand("sudo rm -rf /tmp/crusher/*", "")
+
+	for _, file := range *fileList {
+
+		// Make our temp folder
+		j.runCommand("mkdir -p /tmp/crusher/"+file.Folder, "")
+		err = j.runCommand("sudo mkdir -p "+file.Folder, "") // should prob add chown and chmod to the config structs to set it afterwards
+		if err != nil {
+			j.Errors <- fmt.Errorf(line, "X", "Unable to make directory: "+file.Folder)
+			return err
+		}
+
+		j.Responses <- fmt.Sprintf(line, " ", "Uploading file: "+file.Source+" to "+file.Destination)
+
+		// Read the local file
+		////////////////..........
+		lf, err := os.Open(file.Source)
+		defer lf.Close()
+		if err != nil {
+			j.Errors <- fmt.Errorf(line, "X", "Unable to open local file: "+file.Source)
+			return err
+		}
+
+		lfi, err := lf.Stat()
+		if err != nil {
+			j.Errors <- fmt.Errorf(line, "X", "Unable to inspect local file: "+file.Source)
+			return err
+		}
+
+		fileSize := lfi.Size()
+		fileBytes := make([]byte, fileSize)
+
+		_, err = lf.Read(fileBytes)
+		if err != nil {
+			j.Errors <- fmt.Errorf(line, "X", "Unable to read local file: "+file.Source)
+			return err
+		}
+
+		// Write the remote file
+		////////////////..........
+		rf, err := sftpClient.Create("/tmp/crusher" + file.Destination)
+		defer rf.Close()
+
+		if err != nil {
+			j.Errors <- fmt.Errorf(line, "X", "Unable to create file: "+file.Destination)
+			return err
+		}
+		if _, err := rf.Write(fileBytes); err != nil {
+			j.Errors <- fmt.Errorf(line, "X", "Unable to write file: "+file.Destination)
+			return err
+		}
+
+		// mv
+		j.runCommand("sudo mv /tmp/crusher"+file.Destination+" "+file.Destination, "")
+
+		j.Responses <- fmt.Sprintf(line, "✓", "Completed upload of file: "+file.Source+" to "+file.Destination)
+	}
+
+	return nil
 
 }
 
