@@ -29,6 +29,45 @@ compile **crusher** and put it at the base of a git repo containing your spec fi
 
 4. Run it! `crusher --help`
 
+## Commands
+The available commands can be printed by running `$ crusher` or `$ crusher --help`:
+```
+$ crusher --help
+crusher - 1.0
+
+Usage:
+   crusher [global options] command [command options] [arguments...]
+
+Commands:
+   list-servers, l	List all configured remote servers
+   remote-configure, rc	Configure one or many remote servers
+   local-configure, lc	Configure this local machine with a given spec
+   add-server, a	Add a new remote server to the config
+   delete-server, d	Delete a remote server from the config
+   available-specs, s	List all available specs
+   show-spec, ss	Show what a given spec will build
+   help, h		Shows a list of commands or help for one command
+   
+Global Options:
+   --version, -v	print the version
+   --help, -h		show help
+```
+Help for specific commands can be printed by passing the `--help` flag to the command
+```
+$ crusher remote-configure --help
+Usage:
+   remote-configure search [--flags]
+
+Arguments:
+   search	The server or spec group to remote configure
+
+Flags:
+   
+
+Example:
+   crusher remote-configure hello_world
+```
+
 ## What's a Spec? 
 A `.spec` file (short for specification), along with its `config` and `content` folders, contain the building blocks of a server configutation. Specs contain a list of packages to install, configuration and content files along with their destinations, and commands to run during the configuration job.
 
@@ -71,3 +110,4 @@ This example spec installs nginx and php5-fpm, and serves "Hello World!" from po
 - Pull Jobs into its own package as an interface to help declutter the other controllers
 - Tests!
 - Lots of sanity checking still needed
+- Tab completion
