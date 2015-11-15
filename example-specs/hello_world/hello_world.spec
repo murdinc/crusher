@@ -1,7 +1,7 @@
 # WEBSERVER SPEC FILE
 # /////////////////////////////////////////////////
 
-NAME = webserver
+NAME = hello_world
 
 VERSION = 1
 REQUIRES = nginx, php

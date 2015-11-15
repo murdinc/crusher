@@ -93,10 +93,10 @@ func (r *RemoteJob) Write(b []byte) (int, error) {
 }
 
 // Run Remote Configuration on a target spec group
-func (s Servers) RemoteConfigure(specName string, specList *specr.SpecList) {
+func (s Servers) RemoteConfigure(search string, specList *specr.SpecList) {
 
 	// Get our list of targets
-	targetGroup := s.getTargetGroup(specName)
+	targetGroup := s.getTargetGroup(search)
 
 	configure := cli.PromptBool("Do you want to configure these servers?")
 
@@ -145,7 +145,7 @@ func (s Servers) RemoteConfigure(specName string, specList *specr.SpecList) {
 			SSHConf:   sshConf,
 			WaitGroup: &wg,
 			SpecList:  specList,
-			SpecName:  specName}
+			SpecName:  server.Spec}
 
 		// Launch it!
 		go job.Run()
@@ -192,7 +192,7 @@ func (job *RemoteJob) Run() {
 	defer job.WaitGroup.Done()
 
 	// Open a tcp connection with a timeout
-	job.Responses <- fmt.Sprintf(line, " ", "Opening a new TCP connection...")
+	job.Responses <- fmt.Sprintf(line, "*", "Opening a new TCP connection...")
 	conn, err := net.DialTimeout("tcp", job.Server.Host+":22", job.Timeout)
 
 	if err != nil {
@@ -203,7 +203,7 @@ func (job *RemoteJob) Run() {
 	job.Responses <- fmt.Sprintf(line, "✓", "TCP connection Opened!")
 
 	// Get an ssh client
-	job.Responses <- fmt.Sprintf(line, " ", "Creating new ssh client...")
+	job.Responses <- fmt.Sprintf(line, "*", "Creating new ssh client...")
 	c, chans, reqs, err := ssh.NewClientConn(job.Conn, job.Server.Host, job.SSHConf)
 	if err != nil {
 		job.Errors <- fmt.Errorf(line, "X", "Unable to create SSH client! Aborting futher tasks for this server..")
@@ -214,7 +214,7 @@ func (job *RemoteJob) Run() {
 	job.Responses <- fmt.Sprintf(line, "✓", "SSH client creation Succeeded!")
 
 	// Elevate permissions
-	job.Responses <- fmt.Sprintf(line, " ", "Attempting to elevate permissions...")
+	job.Responses <- fmt.Sprintf(line, "*", "Attempting to elevate permissions...")
 	err = job.runCommand("sudo uname", "sudo uname")
 	if err != nil {
 		job.Errors <- fmt.Errorf(line, "X", "Permission Elevation Failed! Aborting futher tasks for this server..")
@@ -227,7 +227,7 @@ func (job *RemoteJob) Run() {
 
 	// Run Apt-Get Commands
 	aptCmd := job.SpecList.AptGetCmd(job.SpecName)
-	job.Responses <- fmt.Sprintf(line, " ", "Running apt-get Command...")
+	job.Responses <- fmt.Sprintf(line, "*", "Running apt-get Command...")
 	err = job.runCommand(aptCmd, "apt-get")
 	if err != nil {
 		job.Errors <- fmt.Errorf(line, "X", "Command apt-get Failed! Aborting futher tasks for this server..")
@@ -237,7 +237,7 @@ func (job *RemoteJob) Run() {
 
 	// Transfer any files we need to transfer
 	fileList := job.SpecList.DebianFileTransferList(job.SpecName)
-	job.Responses <- fmt.Sprintf(line, " ", "Starting remote file transfer...")
+	job.Responses <- fmt.Sprintf(line, "*", "Starting remote file transfer...")
 	err = job.transferFiles(fileList, "Configuration and Content Files")
 	if err != nil {
 		job.Errors <- fmt.Errorf(line, "X", "File Transfer Failed! Aborting futher tasks for this server..")
@@ -247,7 +247,7 @@ func (job *RemoteJob) Run() {
 
 	// Run post configure commands
 	postCmd := job.SpecList.PostCmd(job.SpecName)
-	job.Responses <- fmt.Sprintf(line, " ", "Running Post-Configuration Command...")
+	job.Responses <- fmt.Sprintf(line, "*", "Running Post-Configuration Command...")
 	err = job.runCommand(postCmd, "Post-Configuration")
 	if err != nil {
 		job.Errors <- fmt.Errorf(line, "X", "Post-Configuration Command Failed!")
@@ -301,7 +301,7 @@ func (j *RemoteJob) transferFiles(fileList *specr.FileTransfers, name string) er
 			return err
 		}
 
-		j.Responses <- fmt.Sprintf(line, " ", "Uploading file: "+file.Source+" to "+file.Destination)
+		j.Responses <- fmt.Sprintf(line, "*", "Uploading file: "+file.Destination)
 
 		// Read the local file
 		////////////////..........
@@ -344,7 +344,7 @@ func (j *RemoteJob) transferFiles(fileList *specr.FileTransfers, name string) er
 		// mv
 		j.runCommand("sudo mv /tmp/crusher"+file.Destination+" "+file.Destination, "")
 
-		j.Responses <- fmt.Sprintf(line, "✓", "Completed upload of file: "+file.Source+" to "+file.Destination)
+		j.Responses <- fmt.Sprintf(line, "✓", "Completed upload of file: "+file.Destination)
 	}
 
 	return nil
@@ -374,14 +374,14 @@ func (servers Servers) PrintAllServerInfo() {
 }
 
 // Gets the target group of servers for a specified spec
-func (servers Servers) getTargetGroup(spec string) Servers {
+func (servers Servers) getTargetGroup(search string) Servers {
 
 	collumns := []string{"Name", "Host", "Username", "Spec", "Password Auth?"}
 	var rows [][]string
 	var targetGroup Servers
 
 	for _, s := range servers {
-		if s.Spec == spec {
+		if s.Spec == search || s.Name == search {
 
 			rows = append(rows, []string{
 				s.Name,
@@ -396,12 +396,12 @@ func (servers Servers) getTargetGroup(spec string) Servers {
 	}
 
 	if len(rows) == 0 {
-		cli.Information(fmt.Sprintf("I couldn't find any servers set up with the spec [%s], here is what I do have: ", spec))
+		cli.Information(fmt.Sprintf("I couldn't find any servers with the name or spec of: [%s], here is what I do have: ", search))
 		servers.PrintAllServerInfo()
 		os.Exit(0)
 	}
 
-	cli.Information(fmt.Sprintf("I found the following servers with the spec [%s]:", spec))
+	cli.Information(fmt.Sprintf("I found the following servers under [%s]:", search))
 	printTable(collumns, rows)
 
 	return targetGroup

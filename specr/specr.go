@@ -1,12 +1,16 @@
 package specr
 
 import (
+	"bytes"
 	"fmt"
 	"os"
+	"os/exec"
 	"os/user"
 	"path"
 	"path/filepath"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/murdinc/cli"
 
@@ -58,6 +62,15 @@ type FileTransfer struct {
 	Chmod       string
 }
 
+// Jobs that run locally
+type LocalJob struct {
+	Responses chan string
+	Errors    chan error
+	SpecName  string
+	SpecList  *SpecList
+	WaitGroup *sync.WaitGroup
+}
+
 type FileTransfers []FileTransfer
 
 // Reads in all the specs and builds a SpecList
@@ -69,14 +82,14 @@ func GetSpecs() (*SpecList, error) {
 
 	currentUser, _ := user.Current()
 	candidates := []string{
-		currentUser.HomeDir + "/crusher_specs/",
-		currentUser.HomeDir + "/crusher-example-specs/",
+		os.Getenv("GOPATH") + "/src/github.com/murdinc/crusher/example-specs/",
 		"/etc/crusher/specs/",
-		"./example-specs/",
+		"./specs/",
+		currentUser.HomeDir + "/crusher/specs/",
 	}
 
-	//
 	walkFn := func(path string, fileInfo os.FileInfo, inErr error) (err error) {
+		//fmt.Printf("%v\n", fileInfo.Name())
 		if inErr == nil && !fileInfo.IsDir() && strings.HasSuffix(strings.ToLower(fileInfo.Name()), ".spec") {
 			err = specList.scanFile(path)
 		}
@@ -232,6 +245,175 @@ func (s *SpecList) ShowSpec(specName string) {
 
 }
 
+// Run Local configuration on this machine
+func (s *SpecList) LocalConfigure(specName string) {
+	// Doesn't really need to use a goroutine now, but maybe we want to run tasks concurrently in the future?
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	responses := make(chan string, 10)
+	errors := make(chan error, 10)
+
+	job := LocalJob{
+		Responses: responses,
+		Errors:    errors,
+		SpecName:  specName,
+		SpecList:  s,
+		WaitGroup: &wg}
+
+	// Launch it!
+	go job.Run()
+
+	// Display Output of Job
+	go func() {
+		for {
+			select {
+			case resp := <-responses:
+				printResp(resp)
+			case err := <-errors:
+				printErr(err.Error())
+			}
+		}
+	}()
+
+	wg.Wait()
+
+	time.Sleep(time.Second)
+}
+
+func (job *LocalJob) Run() {
+	defer job.WaitGroup.Done()
+
+	line := addSpaces("[%s] [local-configure]", 45) + " >> %s " // status, message
+
+	// Run Apt-Get Commands
+	aptCmd := job.SpecList.AptGetCmd(job.SpecName)
+	job.Responses <- fmt.Sprintf(line, "*", "Running apt-get Command...")
+	err := job.runCommand(aptCmd, "apt-get")
+	if err != nil {
+		job.Errors <- fmt.Errorf(line, "X", "Command apt-get Failed! Aborting futher tasks for this server..")
+		return
+	}
+	job.Responses <- fmt.Sprintf(line, "✓", "Command apt-get Succeeded!")
+
+	// Transfer any files we need to transfer
+	fileList := job.SpecList.DebianFileTransferList(job.SpecName)
+	job.Responses <- fmt.Sprintf(line, "*", "Starting file copy...")
+	err = job.transferFiles(fileList, "Configuration and Content Files")
+	if err != nil {
+		job.Errors <- fmt.Errorf(line, "X", "File Copy Failed! Aborting futher tasks for this server..")
+		return
+	}
+	job.Responses <- fmt.Sprintf(line, "✓", "File Copt Succeeded!")
+
+	// Run post configure commands
+	postCmd := job.SpecList.PostCmd(job.SpecName)
+	job.Responses <- fmt.Sprintf(line, "*", "Running Post-Configuration Command...")
+	err = job.runCommand(postCmd, "Post-Configuration")
+	if err != nil {
+		job.Errors <- fmt.Errorf(line, "X", "Post-Configuration Command Failed!")
+	}
+	job.Responses <- fmt.Sprintf(line, "✓", "Post-Configuration Command Succeeded!")
+
+	// End of the line
+}
+
+func (j *LocalJob) runCommand(command string, name string) error {
+
+	parts := strings.Fields(command)
+	cmd := exec.Command(parts[0], parts[1:]...)
+
+	var stdoutBuf bytes.Buffer
+	cmd.Stdout = &stdoutBuf
+
+	err := cmd.Run()
+
+	//j.Responses <- stdoutBuf.String() // TODO handle more verbose output, maybe from a verbose cli flag
+
+	return err
+
+}
+
+func (j *LocalJob) transferFiles(fileList *FileTransfers, name string) error {
+
+	line := addSpaces("[%s] [local-configure]", 45) + " >> %s " // status, message
+
+	// Defer cleanup
+	defer j.runCommand("sudo rm -rf /tmp/crusher/*", "")
+
+	for _, file := range *fileList {
+
+		// Make our temp folder
+		j.runCommand("mkdir -p /tmp/crusher/"+file.Folder, "")
+		err := j.runCommand("sudo mkdir -p "+file.Folder, "") // should prob add chown and chmod to the config structs to set it afterwards
+		if err != nil {
+			j.Errors <- fmt.Errorf(line, "X", "Unable to make directory: "+file.Folder)
+			return err
+		}
+
+		j.Responses <- fmt.Sprintf(line, "*", "Copying file: "+file.Destination)
+
+		// Read the file
+		////////////////..........
+		rf, err := os.Open(file.Source)
+		defer rf.Close()
+		if err != nil {
+			j.Errors <- fmt.Errorf(line, "X", "Unable to open file: "+file.Source)
+			return err
+		}
+
+		rfi, err := rf.Stat()
+		if err != nil {
+			j.Errors <- fmt.Errorf(line, "X", "Unable to inspect file: "+file.Source)
+			return err
+		}
+
+		fileSize := rfi.Size()
+		fileBytes := make([]byte, fileSize)
+
+		_, err = rf.Read(fileBytes)
+		if err != nil {
+			j.Errors <- fmt.Errorf(line, "X", "Unable to read file: "+file.Source)
+			return err
+		}
+
+		// Write the file
+		////////////////..........
+		rf, err = os.Create("/tmp/crusher" + file.Destination)
+		defer rf.Close()
+
+		if err != nil {
+			j.Errors <- fmt.Errorf(line, "X", "Unable to create file: "+file.Destination)
+			return err
+		}
+		if _, err := rf.Write(fileBytes); err != nil {
+			j.Errors <- fmt.Errorf(line, "X", "Unable to write file: "+file.Destination)
+			return err
+		}
+
+		// mv
+		j.runCommand("sudo mv /tmp/crusher"+file.Destination+" "+file.Destination, "")
+
+		j.Responses <- fmt.Sprintf(line, "✓", "Completed copy of file: "+file.Destination)
+	}
+
+	return nil
+
+}
+
+func printResp(msg string) {
+	template := `{{ ansi "fggreen"}}{{ . }}{{ansi ""}}
+	`
+	cli.PrintAnsi(template, msg)
+}
+
+func printErr(msg string) {
+	template := `{{ ansi "fgred"}}{{ . }}{{ansi ""}}
+	`
+	cli.PrintAnsi(template, msg)
+}
+
 // Prints table of all available specs in a table
 func (s *SpecList) PrintSpecTable() {
 
@@ -251,7 +433,7 @@ func (s *SpecList) PrintSpecTable() {
 			spec.Content.Source,
 			spec.Content.DebianRoot,
 			spec.Commands.Post,
-			spec.SpecFile,
+			strings.TrimPrefix(spec.SpecFile, os.Getenv("GOPATH")),
 		})
 	}
 
@@ -296,7 +478,7 @@ func (s *SpecList) getAptPackages(specName string) []string {
 }
 
 // Table helper
-// Used this twice in one project already, maybe its time to move it?
+// Used these twice in one project already, maybe its time to move it?
 func printTable(collumns []string, rows [][]string) {
 	fmt.Println("")
 	t := cli.NewTable(rows, &cli.TableOptions{
@@ -305,4 +487,11 @@ func printTable(collumns []string, rows [][]string) {
 	})
 	t.SetHeader(collumns)
 	fmt.Println(t.Render())
+}
+
+func addSpaces(s string, w int) string {
+	if len(s) < w {
+		s += strings.Repeat(" ", w-len(s))
+	}
+	return s
 }
