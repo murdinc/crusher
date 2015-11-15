@@ -103,6 +103,9 @@ This example spec installs nginx and php5-fpm, and serves "Hello World!" from po
 
 4. Your servers should now be serving "Hello World!" from port 80.
 
+## Crusher? 
+This was a code challenge, and I for some reason immediately thought of the scenario of Wesley Crusher adding a set of commands to the ships computers to automate the set-up new warp engines. Also I needed to call it something. 
+
 ## Roadmap / Not yet implemented
 - SSH Key Authentication (still needs callback func)
 - Support for all flavors of servers (not just Ubuntu)
