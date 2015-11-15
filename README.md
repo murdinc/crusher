@@ -39,18 +39,18 @@ Usage:
    crusher [global options] command [command options] [arguments...]
 
 Commands:
-   list-servers, l	List all configured remote servers
-   remote-configure, rc	Configure one or many remote servers
-   local-configure, lc	Configure this local machine with a given spec
-   add-server, a	Add a new remote server to the config
-   delete-server, d	Delete a remote server from the config
-   available-specs, s	List all available specs
-   show-spec, ss	Show what a given spec will build
-   help, h		Shows a list of commands or help for one command
+   list-servers, l			List all configured remote servers
+   remote-configure, rc		Configure one or many remote servers
+   local-configure, lc		Configure this local machine with a given spec
+   add-server, a			Add a new remote server to the config
+   delete-server, d			Delete a remote server from the config
+   available-specs, s		List all available specs
+   show-spec, ss			Show what a given spec will build
+   help, h					Shows a list of commands or help for one command
    
 Global Options:
-   --version, -v	print the version
-   --help, -h		show help
+   --version, -v			print the version
+   --help, -h				show help
 ```
 Help for specific commands can be printed by passing the `--help` flag to the command
 ```
@@ -59,7 +59,7 @@ Usage:
    remote-configure search [--flags]
 
 Arguments:
-   search	The server or spec group to remote configure
+   search					The server or spec group to remote configure
 
 Flags:
    
