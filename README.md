@@ -88,6 +88,7 @@ Running a Spec against a server looks a little like this:
 
 ## Hello World Example: 
 This example spec installs nginx and php5-fpm, and serves "Hello World!" from port 80.
+
 1. Run the `remote-configure` command, passing in `hello_world` as the search option:
 
   `$ crusher remote-configure hello_world`
