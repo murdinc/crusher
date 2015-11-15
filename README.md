@@ -82,9 +82,9 @@ By default, **crusher** will look for Specs in the following directories, in ord
 
 Running a Spec against a server looks a little like this:
 
-1. Install all required packages from the spec and all of its requires specs
+1. Install all required packages from the spec and all of its required specs
 2. Transfer/Copy all of the config and content files of the spec and its required specs
-3. Run post-config commands of the spec and its requires specs
+3. Run post-config commands of the spec and its required specs
 
 ## Hello World Example: 
 This example spec installs nginx and php5-fpm, and serves "Hello World!" from port 80.
