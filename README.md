@@ -5,7 +5,7 @@
 **crusher** is a minimalist configuration-management tool. It aims to provide as much of the flexibility of the available off-the-shelf options, with as little overhead as possible. 
 
 ## Requirements
-To use this tool, you must at a minimum have the ability to ssh to a host, have permission to write to the temp directory, and run commands with elevated privileges. 
+To use this tool, you must have the ability to ssh to a host, have permission to write to the servers temp directory, and run commands with elevated privileges. 
 
 ## Use Cases
 **crusher** can be used as both a centralized and distributed tool for setting up new servers. 
