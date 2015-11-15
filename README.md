@@ -1,3 +1,4 @@
+[![Build Status](https://travis-ci.org/murdinc/crusher.svg)](https://travis-ci.org/murdinc/crusher)
 # crusher
 > Configuration Management Tool
 
