@@ -54,7 +54,7 @@ func ReadConfig() (*CrusherConfig, error) {
 func (c *CrusherConfig) AddServer() {
 	c.addServerDialog()
 
-	more := cli.PromptBool("Awesome! Do you want to configure any more server?")
+	more := cli.PromptBool("Awesome! Do you want to configure any more servers?")
 	if more {
 		c.AddServer()
 	} else {

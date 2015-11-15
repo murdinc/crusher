@@ -2,13 +2,13 @@
 > Configuration Management Tool
 
 ## Intro
-**crusher** is a minimalist configuration-management tool. It aims to provide much of the flexibility of the available off-the-shelf options, with as little overhead as possible. 
+**crusher** is a minimalist configuration-management tool. It aims to provide much of the flexibility of the available off-the-shelf options, with as little overhead as possible.
 
 ## Requirements
-To use this tool, you must have the ability to ssh to a host, have permission to write to the servers temp directory, and run commands with elevated privileges. 
+To use this tool, you must have the ability to ssh to a host, have permission to write to the servers temp directory, and run commands with elevated privileges.
 
 ## Use Cases
-**crusher** can be used as both a centralized and distributed tool for setting up new servers. 
+**crusher** can be used as both a centralized and distributed tool for setting up new servers.
 
 - Centralized:
 **crusher** manages a list of remote servers that it saves in your users home directory (`~/.crusher`). The `remote-configure` command targets remote servers based on name or spec, and runs configuration tasks on all of them asynchronously.
@@ -22,8 +22,8 @@ compile **crusher** and put it at the base of a git repo containing your spec fi
 2. Download and install crusher:
 
   `$ go get -u github.com/murdinc/crusher`
-	
-3. If `$GOPATH/bin` is not yet in your `$PATH` (check with `$ echo $PATH`): 
+
+3. If `$GOPATH/bin` is not yet in your `$PATH` (check with `$ echo $PATH`):
 
   `$ export PATH="$PATH:$GOPATH/bin"`
 
@@ -47,7 +47,7 @@ Commands:
    available-specs, s		List all available specs
    show-spec, ss			Show what a given spec will build
    help, h					Shows a list of commands or help for one command
-   
+
 Global Options:
    --version, -v			print the version
    --help, -h				show help
@@ -62,18 +62,18 @@ Arguments:
    search					The server or spec group to remote configure
 
 Flags:
-   
+
 
 Example:
    crusher remote-configure hello_world
 ```
 
-## What's a Spec? 
+## What's a Spec?
 A `.spec` file (short for specification), along with its `config` and `content` folders, contain the building blocks of a server configuration. Specs contain a list of packages to install, configuration and content files along with their destinations, and commands to run during the configuration job.
 
-Specs can require other specs, to link smaller building blocks into more complex configurations. Check out `hello_word.spec` in the [example-specs](https://github.com/murdinc/crusher/tree/master/example-specs) folder for a simple example. 
+Specs can require other specs, to link smaller building blocks into more complex configurations. Check out `hello_word.spec` in the [example-specs](https://github.com/murdinc/crusher/tree/master/example-specs) folder for a simple example.
 
-By default, **crusher** will look for Specs in the following directories, in order, overwriting previously found specs with the same name: 
+By default, **crusher** will look for Specs in the following directories, in order, overwriting previously found specs with the same name:
 
 1. $GOPATH/src/github.com/murdinc/crusher/example-specs/
 2. /etc/crusher/specs/
@@ -86,14 +86,14 @@ Running a Spec against a server looks a little like this:
 2. Transfer/Copy all of the config and content files of the spec and its required specs
 3. Run post-config commands of the spec and its required specs
 
-## Hello World Example: 
+## Hello World Example:
 This example spec installs nginx and php5-fpm, and serves "Hello World!" from port 80.
 
 1. Run the `remote-configure` command, passing in `hello_world` as the search option:
 
   `$ crusher remote-configure hello_world`
-  
-2. **crusher** knows you haven't configured any remote servers yet, and asks you to set some up first: 
+
+2. **crusher** knows you haven't configured any remote servers yet, and asks you to set some up first:
 
 	![setup](screenshots/setup.png)
 
@@ -103,8 +103,8 @@ This example spec installs nginx and php5-fpm, and serves "Hello World!" from po
 
 4. Your servers should now be serving "Hello World!" from port 80.
 
-## Crusher? 
-This was a code challenge, and I for some reason immediately thought of the scenario of Wesley Crusher adding a set of commands to the ships computers to automate the set-up new warp engines. Also I needed to call it something. 
+## Crusher?
+This was a code challenge, and I for some reason immediately thought of the scenario of Wesley Crusher adding a set of commands to the ships computers to automate the set-up new warp engines. Also I needed to call it something.
 
 ## Roadmap / Not yet implemented
 - SSH Key Authentication (still needs callback func)
@@ -112,6 +112,6 @@ This was a code challenge, and I for some reason immediately thought of the scen
 - Finer control over tasks run / incremental changes
 - Check and rollback of config changes
 - Pull Jobs into its own package as an interface to help declutter the other controllers
-- Tests!
+- More Tests!
 - Lots of sanity checking still needed
 - Tab completion
