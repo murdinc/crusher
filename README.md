@@ -97,7 +97,7 @@ This example spec installs nginx and php5-fpm, and serves "Hello World!" from po
 
 	![setup](screenshots/setup.png)
 
-3. Run the same command again, and this time it will find the servers you have set up, and run the configurations against them:
+3. Run the same command again, and this time it will find the servers you have set up, and run the spec configurations against them:
 
 	![remote-configure](screenshots/remote-configure.png)
 
