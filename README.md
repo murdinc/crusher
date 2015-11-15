@@ -21,11 +21,11 @@ compile **crusher** and put it at the base of a git repo containing your spec fi
 
 2. Download and install crusher:
 
-  go get -u github.com/murdinc/crusher
+  `$ go get -u github.com/murdinc/crusher`
 	
-3. If `$GOPATH/bin` is not yet in your `$PATH` (check with `echo $PATH`): 
+3. If `$GOPATH/bin` is not yet in your `$PATH` (check with `$ echo $PATH`): 
 
-  export PATH="$PATH:$GOPATH/bin"
+  `$ export PATH="$PATH:$GOPATH/bin"`
 
 4. Run it! `crusher --help`
 
