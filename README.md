@@ -11,7 +11,7 @@ To use this tool, you must at a minimum have the ability to ssh to a host, have 
 **crusher** can be used as both a centralized and distributed tool for setting up new servers. 
 
 - Centralized:
-**crusher** manages a list of remote servers that it saves in your users home directory (`~/.crusher`). The `remote-configure` command targets remote servers based on name or spec, and runs configuration tasks asynchronously on all of them at the same time.
+**crusher** manages a list of remote servers that it saves in your users home directory (`~/.crusher`). The `remote-configure` command targets remote servers based on name or spec, and runs configuration tasks on all of them asynchronously.
 
 - Distributed:
 compile **crusher** and put it at the base of a git repo containing your spec files. New servers can be launched with a script to check out your repo and run crushers `local-configure` command to configure themselves.
