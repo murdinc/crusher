@@ -28,7 +28,15 @@ compile **crusher** and put it at the base of a git repo containing your spec fi
 
   `$ export PATH="$PATH:$GOPATH/bin"`
 
-4. Run it! `crusher --help`
+4. Test it! `$ go test github.com/murdinc/crusher/...`
+
+```
+$ go test github.com/murdinc/crusher/...
+ok  	github.com/murdinc/crusher	0.010s
+ok  	github.com/murdinc/crusher/config	0.011s
+ok  	github.com/murdinc/crusher/servers	0.011s
+ok  	github.com/murdinc/crusher/specr	0.013s
+```
 
 ## Commands
 The available commands can be printed by running `$ crusher` or `$ crusher --help`:
@@ -106,6 +114,17 @@ This example spec installs nginx and php5-fpm, and serves "Hello World!" from po
 
 ## Crusher?
 This was a code challenge, and I for some reason immediately thought of the scenario of Wesley Crusher adding a set of commands to the ships computers to automate the set-up new warp engines. Also I needed to call it something.
+
+## Tests
+There is a very basic test for each of the sub-packages, I hope to expand those after moving the Jobs code into its own sub-package. Running `$ go test github.com/murdinc/crusher/...` will run all tests for this project. 
+
+```
+$ go test github.com/murdinc/crusher/...
+ok  	github.com/murdinc/crusher	0.010s
+ok  	github.com/murdinc/crusher/config	0.011s
+ok  	github.com/murdinc/crusher/servers	0.011s
+ok  	github.com/murdinc/crusher/specr	0.013s
+```
 
 ## Roadmap / Not yet implemented
 - SSH Key Authentication (still needs callback func)
