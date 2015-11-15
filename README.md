@@ -34,7 +34,7 @@ A `.spec` file (short for specification), along with its `config` and `content` 
 
 Specs can require other specs, to link smaller building blocks into more complex configurations. Check out `hello_word.spec` in the [example-specs](https://github.com/murdinc/crusher/tree/master/example-specs) folder for a simple example. 
 
-By default, **crusher** will look for Specs in the following directories in order, overwriting previously found specs with the same name: 
+By default, **crusher** will look for Specs in the following directories, in order, overwriting previously found specs with the same name: 
 
 1. $GOPATH/src/github.com/murdinc/crusher/example-specs/
 2. /etc/crusher/specs/
@@ -48,6 +48,7 @@ Running a Spec against a server looks a little like this:
 3. Run post-config commands of the spec and its requires specs
 
 ## Hello World Example: 
+This example spec installs nginx and php5-fpm, and serves "Hello World!" from port 80.
 1. Run the `remote-configure` command, passing in `hello_world` as the search option:
 
   `$ crusher remote-configure hello_world`
@@ -59,6 +60,8 @@ Running a Spec against a server looks a little like this:
 3. Run the same command again, and this time it will find the servers you have set up, and run the configurations against them:
 
 	![remote-configure](screenshots/remote-configure.png)
+
+4. Your servers should now be serving "Hello World!" from port 80.
 
 ## Roadmap / Not yet implemented
 - SSH Key Authentication (still needs callback func)
