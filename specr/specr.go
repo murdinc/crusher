@@ -220,8 +220,8 @@ func (s *SpecList) getDebianFileTransfers(specName string) *FileTransfers {
 	// Requirement Spec File List
 	////////////////..........
 	for _, reqSpec := range spec.Requires {
-		recFiles := s.getDebianFileTransfers(reqSpec)
-		*files = append(*files, *recFiles...) // dereference blowout sale!
+		reqFiles := s.getDebianFileTransfers(reqSpec)
+		*files = append(*files, *reqFiles...) // dereference blowout sale!
 	}
 
 	return files
