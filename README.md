@@ -2,7 +2,7 @@
 > Configuration Management Tool
 
 ## Intro
-**crusher** is a minimalist configuration-management tool. It aims to provide as much of the flexibility of the available off-the-shelf options, with as little overhead as possible. 
+**crusher** is a minimalist configuration-management tool. It aims to provide much of the flexibility of the available off-the-shelf options, with as little overhead as possible. 
 
 ## Requirements
 To use this tool, you must have the ability to ssh to a host, have permission to write to the servers temp directory, and run commands with elevated privileges. 
