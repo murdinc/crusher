@@ -1,3 +1,4 @@
+<img src="http://sudoba.sh/crusher.png" align="right" />
 # crusher
 > Configuration Management Tool
 
