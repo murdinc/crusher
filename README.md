@@ -54,9 +54,11 @@ Running a Spec against a server looks a little like this:
   
 2. **crusher** knows you haven't configured any remote servers yet, and asks you to set some up first: 
 
+	![setup](screenshots/setup.png)
+
 3. Run the same command again, and this time it will find the servers you have set up, and run the configurations against them:
 
-
+	![remote-configure](screenshots/remote-configure.png)
 
 ## Roadmap / Not yet implemented
 - SSH Key Authentication (still needs callback func)
