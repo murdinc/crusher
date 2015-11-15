@@ -30,7 +30,7 @@ compile **crusher** and put it at the base of a git repo containing your spec fi
 4. Run it! `crusher --help`
 
 ## What's a Spec? 
-A `.spec` file (short for specification), along with a its config and content folders, contain the building blocks of a server configutation. Specs contain a list of packages to install, configuration and content files along with their destinations, and commands to run during the configuration job.
+A `.spec` file (short for specification), along with its `config` and `content` folders, contain the building blocks of a server configutation. Specs contain a list of packages to install, configuration and content files along with their destinations, and commands to run during the configuration job.
 
 Specs can require other specs, to link smaller building blocks into more complex configurations. Check out `hello_word.spec` in the [example-specs](https://github.com/murdinc/crusher/tree/master/example-specs) folder for a simple example. 
 
