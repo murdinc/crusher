@@ -1,6 +1,7 @@
-[![Build Status](https://travis-ci.org/murdinc/crusher.svg)](https://travis-ci.org/murdinc/crusher)
 # crusher
 > Configuration Management Tool
+
+[![Build Status](https://travis-ci.org/murdinc/crusher.svg)](https://travis-ci.org/murdinc/crusher)
 
 ## Intro
 **crusher** is a minimalist configuration-management tool. It aims to provide much of the flexibility of the available off-the-shelf options, with as little overhead as possible.
