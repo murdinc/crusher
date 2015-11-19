@@ -225,6 +225,17 @@ func (job *RemoteJob) Run() {
 	// Actual Work
 	////////////////..........
 
+	// Run pre configure commands
+	preCmd := job.SpecList.PreCmd(job.SpecName)
+	job.Responses <- fmt.Sprintf(line, "*", "Running Pre-Configuration Command...")
+	err = job.runCommand(preCmd, "Pre-Configuration")
+	if err != nil {
+		job.Errors <- fmt.Errorf(line, "X", "Pre-Configuration Command Failed! Aborting futher tasks for this server..")
+		job.Errors <- fmt.Errorf("Error: %s", err)
+		return
+	}
+	job.Responses <- fmt.Sprintf(line, "✓", "Pre-Configuration Command Succeeded!")
+
 	// Run Apt-Get Commands
 	aptCmd := job.SpecList.AptGetCmd(job.SpecName)
 	job.Responses <- fmt.Sprintf(line, "*", "Running apt-get Command...")
@@ -271,7 +282,7 @@ func (j *RemoteJob) runCommand(cmd string, name string) error {
 
 	err = session.Run(cmd)
 
-	// j.Responses <- stdoutBuf.String() // TODO handle more verbose output, maybe from a verbose cli flag
+	//j.Responses <- stdoutBuf.String() // TODO handle more verbose output, maybe from a verbose cli flag
 
 	return err
 

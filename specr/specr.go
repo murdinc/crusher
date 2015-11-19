@@ -49,6 +49,7 @@ type Content struct {
 }
 
 type Commands struct {
+	Pre  string `ini:"pre"`
 	Post string `ini:"post"`
 }
 
@@ -147,6 +148,15 @@ func (s *SpecList) AptGetCmd(specName string) string {
 	return cmd
 }
 
+// Returns the pre-configure command
+func (s *SpecList) PreCmd(specName string) string {
+
+	preConf := s.getPreCommands(specName)
+	cmd := strings.Join(preConf, " && ")
+
+	return cmd
+}
+
 // Returns the post-configure command
 func (s *SpecList) PostCmd(specName string) string {
 
@@ -232,6 +242,9 @@ func (f *FileTransfers) add(file FileTransfer) {
 }
 
 func (s *SpecList) ShowSpec(specName string) {
+
+	cli.Information(fmt.Sprintf("[PRE CONFIGURE COMMAND] >$ %s", s.PreCmd(specName)))
+
 	cli.Information(fmt.Sprintf("[APT-GET COMMAND] >$ %s", s.AptGetCmd(specName)))
 	cli.Information("File Transfer List:")
 
@@ -287,10 +300,20 @@ func (job *LocalJob) Run() {
 
 	line := addSpaces("[%s] [local-configure]", 45) + " >> %s " // status, message
 
+	// Run pre configure commands
+	preCmd := job.SpecList.PreCmd(job.SpecName)
+	job.Responses <- fmt.Sprintf(line, "*", "Running Pre-Configuration Command...")
+	err := job.runCommand(preCmd, "Pre-Configuration")
+	if err != nil {
+		job.Errors <- fmt.Errorf(line, "X", "Pre-Configuration Command Failed! Aborting futher tasks for this server..")
+		return
+	}
+	job.Responses <- fmt.Sprintf(line, "✓", "Pre-Configuration Command Succeeded!")
+
 	// Run Apt-Get Commands
 	aptCmd := job.SpecList.AptGetCmd(job.SpecName)
 	job.Responses <- fmt.Sprintf(line, "*", "Running apt-get Command...")
-	err := job.runCommand(aptCmd, "apt-get")
+	err = job.runCommand(aptCmd, "apt-get")
 	if err != nil {
 		job.Errors <- fmt.Errorf(line, "X", "Command apt-get Failed! Aborting futher tasks for this server..")
 		return
@@ -439,6 +462,25 @@ func (s *SpecList) PrintSpecTable() {
 
 	printTable(collumns, rows)
 
+}
+
+// Recursive unexported func for PreCmd
+func (s *SpecList) getPreCommands(specName string) []string {
+	// The requested spec
+	spec := s.Specs[specName]
+	var commands []string
+
+	// gather all required pre configure commands for this spec
+	if spec.Commands.Pre != "" {
+		commands = append(commands, spec.Commands.Pre)
+	}
+
+	// Loop through this specs requirements to all other pre configure commands we need
+	for _, reqSpec := range spec.Requires {
+		commands = append(commands, s.getPreCommands(reqSpec)...)
+	}
+
+	return commands
 }
 
 // Recursive unexported func for PostCmd
