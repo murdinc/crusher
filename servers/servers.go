@@ -9,8 +9,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/murdinc/cli"
 	"github.com/murdinc/crusher/specr"
+	"github.com/murdinc/terminal"
+	"github.com/olekukonko/tablewriter"
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 )
@@ -98,21 +99,21 @@ func (s Servers) RemoteConfigure(search string, specList *specr.SpecList) {
 	// Get our list of targets
 	targetGroup := s.getTargetGroup(search)
 
-	configure := cli.PromptBool("Do you want to configure these servers?")
+	configure := terminal.PromptBool("Do you want to configure these servers?")
 
 	if !configure {
-		cli.Information("Okay, maybe next time..")
+		terminal.Information("Okay, maybe next time..")
 		os.Exit(0)
 	}
 
 	// Get passwords for hosts that need them
 	for i, server := range targetGroup {
 		if server.PassAuth {
-			targetGroup[i].Password = cli.PromptPassword(fmt.Sprintf("Please enter your password for user [%s] on remote server [%s]:", server.Username, server.Host))
+			targetGroup[i].Password = terminal.PromptPassword(fmt.Sprintf("Please enter your password for user [%s] on remote server [%s]:", server.Username, server.Host))
 		}
 	}
 
-	cli.Information("Great! I'll make it so..")
+	terminal.Information("Great! I'll make it so..")
 
 	responses := make(chan string, 10)
 	errors := make(chan error, 10)
@@ -130,7 +131,7 @@ func (s Servers) RemoteConfigure(search string, specList *specr.SpecList) {
 		if server.PassAuth {
 			sshConf.Auth = []ssh.AuthMethod{ssh.Password(server.Password)}
 		} else {
-			cli.Information("SSH Key Auth is not yet implemented")
+			terminal.Information("SSH Key Auth is not yet implemented")
 			wg.Done()
 			continue
 			//sshConf.Auth =ssh.ClientAuth{ .. ssh stuff .. }
@@ -172,13 +173,13 @@ func (s Servers) RemoteConfigure(search string, specList *specr.SpecList) {
 func printResp(msg string) {
 	template := `{{ ansi "fggreen"}}{{ . }}{{ansi ""}}
 	`
-	cli.PrintAnsi(template, msg)
+	terminal.PrintAnsi(template, msg)
 }
 
 func printErr(msg string) {
 	template := `{{ ansi "fgred"}}{{ . }}{{ansi ""}}
 	`
-	cli.PrintAnsi(template, msg)
+	terminal.PrintAnsi(template, msg)
 }
 
 // Runs the remote Jobs and returns results on the job channels
@@ -407,12 +408,12 @@ func (servers Servers) getTargetGroup(search string) Servers {
 	}
 
 	if len(rows) == 0 {
-		cli.Information(fmt.Sprintf("I couldn't find any servers with the name or spec of: [%s], here is what I do have: ", search))
+		terminal.Information(fmt.Sprintf("I couldn't find any servers with the name or spec of: [%s], here is what I do have: ", search))
 		servers.PrintAllServerInfo()
 		os.Exit(0)
 	}
 
-	cli.Information(fmt.Sprintf("I found the following servers under [%s]:", search))
+	terminal.Information(fmt.Sprintf("I found the following servers under [%s]:", search))
 	printTable(collumns, rows)
 
 	return targetGroup
@@ -420,14 +421,11 @@ func (servers Servers) getTargetGroup(search string) Servers {
 }
 
 // Table helper
-func printTable(collumns []string, rows [][]string) {
-	fmt.Println("")
-	t := cli.NewTable(rows, &cli.TableOptions{
-		Padding:      1,
-		UseSeparator: true,
-	})
-	t.SetHeader(collumns)
-	fmt.Println(t.Render())
+func printTable(header []string, rows [][]string) {
+	table := tablewriter.NewWriter(os.Stdout)
+	table.SetHeader(header)
+	table.AppendBulk(rows)
+	table.Render()
 }
 
 func addSpaces(s string, w int) string {

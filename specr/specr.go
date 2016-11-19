@@ -12,7 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/murdinc/cli"
+	"github.com/murdinc/terminal"
+	"github.com/olekukonko/tablewriter"
 
 	"gopkg.in/ini.v1"
 )
@@ -243,10 +244,10 @@ func (f *FileTransfers) add(file FileTransfer) {
 
 func (s *SpecList) ShowSpec(specName string) {
 
-	cli.Information(fmt.Sprintf("[PRE CONFIGURE COMMAND] >$ %s", s.PreCmd(specName)))
+	terminal.Information(fmt.Sprintf("[PRE CONFIGURE COMMAND] >$ %s", s.PreCmd(specName)))
 
-	cli.Information(fmt.Sprintf("[APT-GET COMMAND] >$ %s", s.AptGetCmd(specName)))
-	cli.Information("File Transfer List:")
+	terminal.Information(fmt.Sprintf("[APT-GET COMMAND] >$ %s", s.AptGetCmd(specName)))
+	terminal.Information("File Transfer List:")
 
 	fileList := s.DebianFileTransferList(specName)
 
@@ -254,7 +255,7 @@ func (s *SpecList) ShowSpec(specName string) {
 		fmt.Printf("#%d - \n		Source: %s \n		Destination: %s\n		Folder: %s\n\n", i+1, file.Source, file.Destination, file.Folder)
 	}
 
-	cli.Information(fmt.Sprintf("[POST CONFIGURE COMMAND] >$ %s", s.PostCmd(specName)))
+	terminal.Information(fmt.Sprintf("[POST CONFIGURE COMMAND] >$ %s", s.PostCmd(specName)))
 
 }
 
@@ -428,13 +429,13 @@ func (j *LocalJob) transferFiles(fileList *FileTransfers, name string) error {
 func printResp(msg string) {
 	template := `{{ ansi "fggreen"}}{{ . }}{{ansi ""}}
 	`
-	cli.PrintAnsi(template, msg)
+	terminal.PrintAnsi(template, msg)
 }
 
 func printErr(msg string) {
 	template := `{{ ansi "fgred"}}{{ . }}{{ansi ""}}
 	`
-	cli.PrintAnsi(template, msg)
+	terminal.PrintAnsi(template, msg)
 }
 
 // Prints table of all available specs in a table
@@ -519,16 +520,12 @@ func (s *SpecList) getAptPackages(specName string) []string {
 	return packages
 }
 
-// Table helper
-// Used these twice in one project already, maybe its time to move it?
-func printTable(collumns []string, rows [][]string) {
-	fmt.Println("")
-	t := cli.NewTable(rows, &cli.TableOptions{
-		Padding:      1,
-		UseSeparator: true,
-	})
-	t.SetHeader(collumns)
-	fmt.Println(t.Render())
+func printTable(header []string, rows [][]string) {
+
+	table := tablewriter.NewWriter(os.Stdout)
+	table.SetHeader(header)
+	table.AppendBulk(rows)
+	table.Render()
 }
 
 func addSpaces(s string, w int) string {
