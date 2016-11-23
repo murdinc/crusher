@@ -51,7 +51,7 @@ func ReadConfig() (*CrusherConfig, error) {
 }
 
 // Interactive new server setup
-func (c *CrusherConfig) AddServer() {
+func (c *CrusherConfig) AddServer() error {
 	c.addServerDialog()
 
 	more := terminal.PromptBool("Awesome! Do you want to configure any more servers?")
@@ -61,8 +61,7 @@ func (c *CrusherConfig) AddServer() {
 		terminal.Information("Okay, I will save this configuration then!")
 	}
 
-	c.SaveConfig()
-
+	return c.SaveConfig()
 }
 
 // Save our list of servers into the config file
@@ -92,7 +91,7 @@ func (c *CrusherConfig) SaveConfig() error {
 }
 
 // Delete a specific server from the config file
-func (c *CrusherConfig) DeleteServer() {
+func (c *CrusherConfig) DeleteServer() error {
 	count := len(c.Servers)
 	terminal.Information(fmt.Sprintf("There are [%d] servers configured currently", count))
 	c.Servers.PrintAllServerInfo()
@@ -104,9 +103,9 @@ func (c *CrusherConfig) DeleteServer() {
 	sure := terminal.PromptBool("Are you sure you want to delete this server?")
 	if sure {
 		c.Servers, c.Servers[len(c.Servers)-1] = append(c.Servers[:index], c.Servers[index+1:]...), servers.Server{}
-		c.SaveConfig()
+		return c.SaveConfig()
 	}
-
+	return nil
 }
 
 // Input flow for interactive server setup

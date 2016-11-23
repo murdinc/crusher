@@ -103,7 +103,7 @@ func (s Servers) RemoteConfigure(search string, specList *specr.SpecList) {
 
 	if !configure {
 		terminal.Information("Okay, maybe next time..")
-		os.Exit(0)
+		return
 	}
 
 	// Get passwords for hosts that need them

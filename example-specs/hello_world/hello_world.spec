@@ -19,9 +19,7 @@ REQUIRES = nginx, php
 	debian_root = "/usr/share/nginx/html/"
 
 [COMMANDS]
-	pre = "sudo pkill -fx 'nc -k -l 0.0.0.0 80' & sudo lsof -t +L1 /tmp | sudo xargs kill -9  & sudo resolvconf -u"
-	# kill netcat on port 80, flush unlinked tmp files, update resolv.conf
+	pre = ""
 
-	post = "sudo service nginx start & sudo service php5-fpm start & sudo iptables-restore < /etc/iptables.hello_world & sudo service nginx reload"
-	# start nginx and php5-fpm incase they arent running, set iptables rules, reload nginx configs
+	post = "sudo service nginx start, sudo service php5-fpm start, sudo service nginx reload"
 

@@ -17,7 +17,7 @@ func main() {
 	app := cli.NewApp()
 	app.Name = "crusher"
 	app.Usage = "Command Line Configuration Management System"
-	app.Version = "1.0"
+	app.Version = "1.1"
 	app.Author = "Ahmad Abdo"
 	app.Email = "send@ahmad.pizza"
 
@@ -49,10 +49,8 @@ func main() {
 					return err
 				}
 
-				search := c.NamedArg("search")
-
 				cfg := getConfig()
-				cfg.Servers.RemoteConfigure(search, specList)
+				cfg.Servers.RemoteConfigure(c.NamedArg("search"), specList)
 				return nil
 			},
 		},
@@ -77,7 +75,6 @@ func main() {
 					return nil
 				}
 
-				//specList.ShowSpec(c.NamedArg("spec"))
 				specList.LocalConfigure(specName)
 				return nil
 			},
@@ -89,8 +86,7 @@ func main() {
 			Description: "Add a new remote server to the config",
 			Action: func(c *cli.Context) error {
 				cfg := getConfig()
-				cfg.AddServer()
-				return nil
+				return cfg.AddServer()
 			},
 		},
 		{
@@ -100,8 +96,7 @@ func main() {
 			Description: "Delete a remote server from the config",
 			Action: func(c *cli.Context) error {
 				cfg := getConfig()
-				cfg.DeleteServer()
-				return nil
+				return cfg.DeleteServer()
 			},
 		},
 		{
@@ -113,10 +108,12 @@ func main() {
 				specList, err := specr.GetSpecs()
 				if err != nil {
 					terminal.ShowErrorMessage("Error Reading Spec Files!", err.Error())
+					return err
 				}
 
 				terminal.Information(fmt.Sprintf("There are [%d] specs available currently", len(specList.Specs)))
-				specList.PrintSpecTable()
+				specList.PrintSpecInformation()
+
 				return nil
 			},
 		},

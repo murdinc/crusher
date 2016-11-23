@@ -13,4 +13,5 @@ REQUIRES = ""
 	debian_root = "/etc/"
 
 [COMMANDS]
-	# NONE
+
+	post = "sudo service php5-fpm start"

@@ -1,10 +1,8 @@
 package specr
 
 import (
-	"bytes"
 	"fmt"
 	"os"
-	"os/exec"
 	"os/user"
 	"path"
 	"path/filepath"
@@ -50,8 +48,8 @@ type Content struct {
 }
 
 type Commands struct {
-	Pre  string `ini:"pre"`
-	Post string `ini:"post"`
+	Pre  []string `ini:"pre"`
+	Post []string `ini:"post"`
 }
 
 // FileTransfer Struct
@@ -142,7 +140,6 @@ func (s *SpecList) SpecExists(spec string) bool {
 
 // Returns the apt-get command for a given spec
 func (s *SpecList) AptGetCmd(specName string) string {
-
 	packages := s.getAptPackages(specName)
 	cmd := "sudo apt-get update && sudo apt-get install -y " + strings.Join(packages, " ") // TODO less hard coded?
 
@@ -284,9 +281,9 @@ func (s *SpecList) LocalConfigure(specName string) {
 		for {
 			select {
 			case resp := <-responses:
-				printResp(resp)
+				terminal.Response(resp)
 			case err := <-errors:
-				printErr(err.Error())
+				terminal.ErrorLine(err.Error())
 			}
 		}
 	}()
@@ -299,7 +296,7 @@ func (s *SpecList) LocalConfigure(specName string) {
 func (job *LocalJob) Run() {
 	defer job.WaitGroup.Done()
 
-	line := addSpaces("[%s] [local-configure]", 45) + " >> %s " // status, message
+	line := addSpaces("[%s] [local-configure]", 35) + " >> %s " // status, message
 
 	// Run pre configure commands
 	preCmd := job.SpecList.PreCmd(job.SpecName)
@@ -345,23 +342,31 @@ func (job *LocalJob) Run() {
 
 func (j *LocalJob) runCommand(command string, name string) error {
 
-	parts := strings.Fields(command)
-	cmd := exec.Command(parts[0], parts[1:]...)
+	if len(command) > 0 {
 
-	var stdoutBuf bytes.Buffer
-	cmd.Stdout = &stdoutBuf
+		println(command)
+		/*
+			parts := strings.Fields(command)
+			cmd := exec.Command(parts[0], parts[1:]...)
 
-	err := cmd.Run()
+			var stdoutBuf bytes.Buffer
+			cmd.Stdout = &stdoutBuf
 
-	//j.Responses <- stdoutBuf.String() // TODO handle more verbose output, maybe from a verbose cli flag
+			err := cmd.Run()
 
-	return err
+			//j.Responses <- stdoutBuf.String() // TODO handle more verbose output, maybe from a verbose cli flag
+
+			return err
+		*/
+	}
+
+	return nil
 
 }
 
 func (j *LocalJob) transferFiles(fileList *FileTransfers, name string) error {
 
-	line := addSpaces("[%s] [local-configure]", 45) + " >> %s " // status, message
+	line := addSpaces("[%s] [local-configure]", 35) + " >> %s " // status, message
 
 	// Defer cleanup
 	defer j.runCommand("sudo rm -rf /tmp/crusher/*", "")
@@ -426,44 +431,35 @@ func (j *LocalJob) transferFiles(fileList *FileTransfers, name string) error {
 
 }
 
-func printResp(msg string) {
-	template := `{{ ansi "fggreen"}}{{ . }}{{ansi ""}}
-	`
-	terminal.PrintAnsi(template, msg)
-}
-
-func printErr(msg string) {
-	template := `{{ ansi "fgred"}}{{ . }}{{ansi ""}}
-	`
-	terminal.PrintAnsi(template, msg)
-}
-
 // Prints table of all available specs in a table
-func (s *SpecList) PrintSpecTable() {
-
-	// Build the table elements
-	collumns := []string{"Spec Name", "Version", "Requires", "Apt Packages", "Debian Config Root", "Content Source", "Debian Content Root", "Post Commands", "Spec File"}
-
-	var rows [][]string
-
-	// TODO this is a wide table, so when values get longer we will need to trim some stuff.
-	for name, spec := range s.Specs {
-		rows = append(rows, []string{
-			name,
-			spec.Version,
-			strings.Join(spec.Requires, ", "),
-			strings.Join(spec.Packages.AptGet, ", "),
-			spec.Configs.DebianRoot,
-			spec.Content.Source,
-			spec.Content.DebianRoot,
-			spec.Commands.Post,
-			strings.TrimPrefix(spec.SpecFile, os.Getenv("GOPATH")),
-		})
-	}
-
-	printTable(collumns, rows)
-
+func (s *SpecList) PrintSpecInformation() {
+	terminal.PrintAnsi(SpecTemplate, s)
 }
+
+var SpecTemplate = `{{range $name, $spec := .Specs}}
+{{ansi ""}}{{ ansi "underscore"}}{{ ansi "bright" }}{{ ansi "fgwhite"}}[{{ $name }}]{{ ansi ""}}
+	{{ ansi "bright"}}{{ ansi "fgwhite"}}                Version: {{ ansi ""}}{{ ansi "fgcyan"}}{{ $spec.Version }}{{ ansi ""}}
+	{{ ansi "bright"}}{{ ansi "fgwhite"}}                   Root: {{ ansi ""}}{{ ansi "fgcyan"}}{{ $spec.SpecRoot }}{{ ansi ""}}
+	{{ ansi "bright"}}{{ ansi "fgwhite"}}                   File: {{ ansi ""}}{{ ansi "fgcyan"}}{{ $spec.SpecFile }}{{ ansi ""}}
+
+	{{ ansi "bright"}}{{ ansi "fgwhite"}}               Requires: {{ ansi ""}}{{ ansi "fgcyan"}}{{ range $spec.Requires }}{{ . }} {{ end }}{{ ansi ""}}
+	{{ ansi "bright"}}{{ ansi "fgwhite"}}           Apt Packages: {{ ansi ""}}{{ ansi "fgcyan"}}{{ range $spec.Packages.AptGet }}{{ . }} {{ end }}{{ ansi ""}}
+
+	{{ ansi "bright"}}{{ ansi "fgwhite"}}    Debian Configs Root: {{ ansi ""}}{{ ansi "fgcyan"}}{{ $spec.Configs.DebianRoot }}{{ ansi ""}}
+
+	{{ ansi "bright"}}{{ ansi "fgwhite"}}         Content Source: {{ ansi ""}}{{ ansi "fgcyan"}}{{ $spec.Content.Source }}{{ ansi ""}}
+	{{ ansi "bright"}}{{ ansi "fgwhite"}}    Debian Content Root: {{ ansi ""}}{{ ansi "fgcyan"}}{{ $spec.Content.DebianRoot }}{{ ansi ""}}
+
+	{{ ansi "bright"}}{{ ansi "fgwhite"}}  Pre-configure Command: {{ ansi ""}}{{ ansi "fgcyan"}}{{ range $spec.Commands.Pre }}{{ printf "%s" . }}
+				 {{ end }}{{ ansi ""}}
+	{{ ansi "bright"}}{{ ansi "fgwhite"}} Post-configure Command: {{ ansi ""}}{{ ansi "fgcyan"}}{{ range $spec.Commands.Post }}{{ printf "%s" . }}
+				 {{ end }}{{ ansi ""}}
+
+
+{{ ansi "fgwhite"}}------------------------------------------------------------------------------------------------
+{{ ansi ""}}
+{{ end }}
+`
 
 // Recursive unexported func for PreCmd
 func (s *SpecList) getPreCommands(specName string) []string {
@@ -472,8 +468,10 @@ func (s *SpecList) getPreCommands(specName string) []string {
 	var commands []string
 
 	// gather all required pre configure commands for this spec
-	if spec.Commands.Pre != "" {
-		commands = append(commands, spec.Commands.Pre)
+	if len(spec.Commands.Pre) > 0 {
+		for _, pre := range spec.Commands.Pre {
+			commands = append(commands, pre)
+		}
 	}
 
 	// Loop through this specs requirements to all other pre configure commands we need
@@ -491,8 +489,10 @@ func (s *SpecList) getPostCommands(specName string) []string {
 	var commands []string
 
 	// gather all required post configure commands for this spec
-	if spec.Commands.Post != "" {
-		commands = append(commands, spec.Commands.Post)
+	if len(spec.Commands.Post) > 0 {
+		for _, post := range spec.Commands.Post {
+			commands = append(commands, post)
+		}
 	}
 
 	// Loop through this specs requirements to all other post configure commands we need
