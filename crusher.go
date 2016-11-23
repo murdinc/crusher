@@ -137,7 +137,7 @@ func main() {
 					return nil
 				}
 
-				specList.ShowSpec(specName)
+				specList.ShowSpecBuild(specName)
 				return nil
 			},
 		},

@@ -4,7 +4,7 @@
 NAME = php
 
 VERSION = 1
-REQUIRES = ""
+REQUIRES =
 
 [PACKAGES]
 	apt_get = php5-fpm

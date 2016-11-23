@@ -4,7 +4,7 @@
 NAME = nginx
 
 VERSION = 1
-REQUIRES = ""
+REQUIRES =
 
 [PACKAGES]
 	apt_get = nginx

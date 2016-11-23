@@ -19,7 +19,6 @@ REQUIRES = nginx, php
 	debian_root = "/usr/share/nginx/html/"
 
 [COMMANDS]
-	pre = ""
 
 	post = "sudo service nginx start, sudo service php5-fpm start, sudo service nginx reload"
 

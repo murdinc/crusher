@@ -1,8 +1,10 @@
 package specr
 
 import (
+	"bytes"
 	"fmt"
 	"os"
+	"os/exec"
 	"os/user"
 	"path"
 	"path/filepath"
@@ -25,7 +27,7 @@ type SpecList struct {
 
 type Spec struct {
 	Version  string   `ini:"VERSION"`
-	Requires []string `ini:"REQUIRES"`
+	Requires []string `ini:"REQUIRES,omitempty"`
 	Packages Packages `ini:"PACKAGES"`
 	Configs  Configs  `ini:"CONFIGS"`
 	Content  Content  `ini:"CONTENT"`
@@ -48,8 +50,16 @@ type Content struct {
 }
 
 type Commands struct {
-	Pre  []string `ini:"pre"`
-	Post []string `ini:"post"`
+	Pre  []string `ini:"pre,omitempty"`
+	Post []string `ini:"post,omitempty"`
+}
+
+type SpecSummary struct {
+	Name      string
+	PreCmd    string
+	AptCmd    string
+	Transfers *FileTransfers
+	PostCmd   string
 }
 
 // FileTransfer Struct
@@ -175,13 +185,14 @@ func (s *SpecList) DebianFileTransferList(specName string) *FileTransfers {
 
 // Recursive unexported func for FileTransferList
 func (s *SpecList) getDebianFileTransfers(specName string) *FileTransfers {
-	// much append, sry. TODO?
-	// TODO split up?
 
 	// The requested spec
 	spec := s.Specs[specName]
-
 	files := new(FileTransfers)
+
+	if spec == nil {
+		return files
+	}
 
 	// Spec Configs
 	////////////////..........
@@ -229,7 +240,7 @@ func (s *SpecList) getDebianFileTransfers(specName string) *FileTransfers {
 	////////////////..........
 	for _, reqSpec := range spec.Requires {
 		reqFiles := s.getDebianFileTransfers(reqSpec)
-		*files = append(*files, *reqFiles...) // dereference blowout sale!
+		*files = append(*files, *reqFiles...)
 	}
 
 	return files
@@ -239,22 +250,28 @@ func (f *FileTransfers) add(file FileTransfer) {
 	*f = append(*f, file)
 }
 
-func (s *SpecList) ShowSpec(specName string) {
+func (s *SpecList) ShowSpecBuild(specName string) {
 
-	terminal.Information(fmt.Sprintf("[PRE CONFIGURE COMMAND] >$ %s", s.PreCmd(specName)))
-
-	terminal.Information(fmt.Sprintf("[APT-GET COMMAND] >$ %s", s.AptGetCmd(specName)))
-	terminal.Information("File Transfer List:")
-
-	fileList := s.DebianFileTransferList(specName)
-
-	for i, file := range *fileList {
-		fmt.Printf("#%d - \n		Source: %s \n		Destination: %s\n		Folder: %s\n\n", i+1, file.Source, file.Destination, file.Folder)
-	}
-
-	terminal.Information(fmt.Sprintf("[POST CONFIGURE COMMAND] >$ %s", s.PostCmd(specName)))
-
+	terminal.PrintAnsi(SpecBuildTemplate, SpecSummary{
+		Name:      specName,
+		PreCmd:    s.PreCmd(specName),
+		AptCmd:    s.AptGetCmd(specName),
+		Transfers: s.DebianFileTransferList(specName),
+		PostCmd:   s.PostCmd(specName),
+	})
 }
+
+var SpecBuildTemplate = `
+{{ansi ""}}{{ ansi "underscore"}}{{ ansi "bright" }}{{ ansi "fgwhite"}}[{{ .Name }}]{{ ansi ""}}
+	{{ ansi "bright"}}{{ ansi "fgwhite"}}  Pre-configure Command: {{ ansi ""}}{{ ansi "fgcyan"}}{{ .PreCmd }}{{ ansi ""}}
+	{{ ansi "bright"}}{{ ansi "fgwhite"}}            Apt Command: {{ ansi ""}}{{ ansi "fgcyan"}}{{ .AptCmd }}{{ ansi ""}}
+	{{ ansi "bright"}}{{ ansi "fgwhite"}}         File Transfers: {{ ansi ""}}{{ ansi "fgcyan"}}{{range .Transfers}}
+				      Source: {{ .Source }}
+				 Destination: {{ .Destination }}
+				      Folder: {{ .Folder }}
+				 {{ end }}{{ ansi ""}}
+	{{ ansi "bright"}}{{ ansi "fgwhite"}} Post-configure Command: {{ ansi ""}}{{ ansi "fgcyan"}}{{ .PostCmd }}{{ ansi ""}}
+`
 
 // Run Local configuration on this machine
 func (s *SpecList) LocalConfigure(specName string) {
@@ -344,20 +361,18 @@ func (j *LocalJob) runCommand(command string, name string) error {
 
 	if len(command) > 0 {
 
-		println(command)
-		/*
-			parts := strings.Fields(command)
-			cmd := exec.Command(parts[0], parts[1:]...)
+		parts := strings.Fields(command)
+		cmd := exec.Command(parts[0], parts[1:]...)
 
-			var stdoutBuf bytes.Buffer
-			cmd.Stdout = &stdoutBuf
+		var stdoutBuf bytes.Buffer
+		cmd.Stdout = &stdoutBuf
 
-			err := cmd.Run()
+		err := cmd.Run()
 
-			//j.Responses <- stdoutBuf.String() // TODO handle more verbose output, maybe from a verbose cli flag
+		//j.Responses <- stdoutBuf.String() // TODO handle more verbose output, maybe from a verbose cli flag
 
-			return err
-		*/
+		return err
+
 	}
 
 	return nil
@@ -466,17 +481,22 @@ func (s *SpecList) getPreCommands(specName string) []string {
 	// The requested spec
 	spec := s.Specs[specName]
 	var commands []string
+	if spec == nil {
+		return nil
+	}
 
 	// gather all required pre configure commands for this spec
-	if len(spec.Commands.Pre) > 0 {
-		for _, pre := range spec.Commands.Pre {
+	for _, pre := range spec.Commands.Pre {
+		if pre != "" {
 			commands = append(commands, pre)
 		}
 	}
 
 	// Loop through this specs requirements to all other pre configure commands we need
 	for _, reqSpec := range spec.Requires {
-		commands = append(commands, s.getPreCommands(reqSpec)...)
+		if reqSpec != "" {
+			commands = append(commands, s.getPreCommands(reqSpec)...)
+		}
 	}
 
 	return commands
@@ -487,6 +507,10 @@ func (s *SpecList) getPostCommands(specName string) []string {
 	// The requested spec
 	spec := s.Specs[specName]
 	var commands []string
+
+	if spec == nil {
+		return nil
+	}
 
 	// gather all required post configure commands for this spec
 	if len(spec.Commands.Post) > 0 {
@@ -508,6 +532,9 @@ func (s *SpecList) getAptPackages(specName string) []string {
 	// The requested spec
 	spec := s.Specs[specName]
 	var packages []string
+	if spec == nil {
+		return nil
+	}
 
 	// gather all required apt-get packages for this spec
 	packages = append(packages, spec.Packages.AptGet...)
