@@ -500,7 +500,7 @@ func (s *SpecList) getPreCommands(specName string) []string {
 	for _, reqSpec := range spec.Requires {
 		if reqSpec != "" {
 			//commands = append(commands, s.getPreCommands(reqSpec)...)
-			commands = append(s.getPreCommands(reqSpec), commands...)
+			commands = append(commands, s.getPreCommands(reqSpec)...)
 		}
 	}
 
@@ -526,7 +526,7 @@ func (s *SpecList) getPostCommands(specName string) []string {
 
 	// Loop through this specs requirements to all other post configure commands we need
 	for _, reqSpec := range spec.Requires {
-		commands = append(s.getPostCommands(reqSpec), commands...)
+		commands = append(commands, s.getPostCommands(reqSpec)...)
 	}
 
 	return commands
@@ -546,7 +546,7 @@ func (s *SpecList) getAptPackages(specName string) []string {
 
 	// Loop through this specs requirements gather to all other apt-get packages we need
 	for _, reqSpec := range spec.Requires {
-		packages = append(s.getAptPackages(reqSpec), packages...)
+		packages = append(packages, s.getAptPackages(reqSpec)...)
 	}
 
 	return packages

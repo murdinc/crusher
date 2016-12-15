@@ -14,4 +14,4 @@ REQUIRES =
 
 [COMMANDS]
 
-	post = "sudo service php7.0-fpm start"
+	post = "sudo service php7.0-fpm start, sudo service php7.0-fpm reload"

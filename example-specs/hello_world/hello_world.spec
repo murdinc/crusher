@@ -4,7 +4,7 @@
 NAME = hello_world
 
 VERSION = 1
-REQUIRES = nginx, php
+REQUIRES = php, nginx
 
 [PACKAGES]
 	# NONE
@@ -19,6 +19,4 @@ REQUIRES = nginx, php
 	debian_root = "/var/www/html/"
 
 [COMMANDS]
-
-	post = "sudo service nginx reload, sudo service php7.0-fpm reload"
 
