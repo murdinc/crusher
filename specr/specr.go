@@ -500,7 +500,7 @@ func (s *SpecList) getPreCommands(specName string) []string {
 	for _, reqSpec := range spec.Requires {
 		if reqSpec != "" {
 			//commands = append(commands, s.getPreCommands(reqSpec)...)
-			commands = append(commands, s.getPreCommands(reqSpec)...)
+			commands = append(s.getPreCommands(reqSpec), commands...)
 		}
 	}
 
