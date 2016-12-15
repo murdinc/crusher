@@ -56,10 +56,10 @@ type Commands struct {
 
 type SpecSummary struct {
 	Name      string
-	PreCmd    string
-	AptCmd    string
+	PreCmds   []string
+	AptCmds   []string
 	Transfers *FileTransfers
-	PostCmd   string
+	PostCmds  []string
 }
 
 // FileTransfer Struct
@@ -148,30 +148,24 @@ func (s *SpecList) SpecExists(spec string) bool {
 	return false
 }
 
-// Returns the apt-get command for a given spec
-func (s *SpecList) AptGetCmd(specName string) string {
+// Returns the apt-get commands for a given spec
+func (s *SpecList) AptGetCmds(specName string) (cmds []string) {
 	packages := s.getAptPackages(specName)
-	cmd := "sudo apt-get update && sudo apt-get install -y " + strings.Join(packages, " ") // TODO less hard coded?
+	if len(packages) > 0 {
+		cmds = []string{"sudo apt-get update", "sudo apt-get install -y " + strings.Join(packages, " ")}
+	}
 
-	return cmd
+	return cmds
 }
 
-// Returns the pre-configure command
-func (s *SpecList) PreCmd(specName string) string {
-
-	preConf := s.getPreCommands(specName)
-	cmd := strings.Join(preConf, " && ")
-
-	return cmd
+// Returns the pre-configure commands
+func (s *SpecList) PreCmds(specName string) []string {
+	return s.getPreCommands(specName)
 }
 
-// Returns the post-configure command
-func (s *SpecList) PostCmd(specName string) string {
-
-	postConf := s.getPostCommands(specName)
-	cmd := strings.Join(postConf, " && ")
-
-	return cmd
+// Returns the post-configure commands
+func (s *SpecList) PostCmds(specName string) []string {
+	return s.getPostCommands(specName)
 }
 
 func (s *SpecList) DebianFileTransferList(specName string) *FileTransfers {
@@ -254,23 +248,26 @@ func (s *SpecList) ShowSpecBuild(specName string) {
 
 	terminal.PrintAnsi(SpecBuildTemplate, SpecSummary{
 		Name:      specName,
-		PreCmd:    s.PreCmd(specName),
-		AptCmd:    s.AptGetCmd(specName),
+		PreCmds:   s.PreCmds(specName),
+		AptCmds:   s.AptGetCmds(specName),
 		Transfers: s.DebianFileTransferList(specName),
-		PostCmd:   s.PostCmd(specName),
+		PostCmds:  s.PostCmds(specName),
 	})
 }
 
 var SpecBuildTemplate = `
 {{ansi ""}}{{ ansi "underscore"}}{{ ansi "bright" }}{{ ansi "fgwhite"}}[{{ .Name }}]{{ ansi ""}}
-	{{ ansi "bright"}}{{ ansi "fgwhite"}}  Pre-configure Command: {{ ansi ""}}{{ ansi "fgcyan"}}{{ .PreCmd }}{{ ansi ""}}
-	{{ ansi "bright"}}{{ ansi "fgwhite"}}            Apt Command: {{ ansi ""}}{{ ansi "fgcyan"}}{{ .AptCmd }}{{ ansi ""}}
-	{{ ansi "bright"}}{{ ansi "fgwhite"}}         File Transfers: {{ ansi ""}}{{ ansi "fgcyan"}}{{range .Transfers}}
+	{{ ansi "bright"}}{{ ansi "fgwhite"}}  pre-configure Commands: {{ ansi ""}}{{ ansi "fgcyan"}}{{ range .PreCmds }}{{ . }}
+				  {{ end }}{{ ansi ""}}
+	{{ ansi "bright"}}{{ ansi "fgwhite"}}        apt-get Commands: {{ ansi ""}}{{ ansi "fgcyan"}}{{ range .AptCmds }}{{ . }}
+				  {{ end }}{{ ansi ""}}
+	{{ ansi "bright"}}{{ ansi "fgwhite"}}          File Transfers: {{ ansi ""}}{{ ansi "fgcyan"}}{{range .Transfers}}
 				      Source: {{ .Source }}
 				 Destination: {{ .Destination }}
 				      Folder: {{ .Folder }}
 				 {{ end }}{{ ansi ""}}
-	{{ ansi "bright"}}{{ ansi "fgwhite"}} Post-configure Command: {{ ansi ""}}{{ ansi "fgcyan"}}{{ .PostCmd }}{{ ansi ""}}
+	{{ ansi "bright"}}{{ ansi "fgwhite"}} post-configure Commands: {{ ansi ""}}{{ ansi "fgcyan"}}{{ range .PostCmds }}{{ . }}
+				  {{ end }}{{ ansi ""}}
 `
 
 // Run Local configuration on this machine
@@ -316,51 +313,61 @@ func (job *LocalJob) Run() {
 	line := addSpaces("[%s] [local-configure]", 35) + " >> %s " // status, message
 
 	// Run pre configure commands
-	preCmd := job.SpecList.PreCmd(job.SpecName)
-	job.Responses <- fmt.Sprintf(line, "*", "Running Pre-Configuration Command...")
-	err := job.runCommand(preCmd, "Pre-Configuration")
-	if err != nil {
-		job.Errors <- fmt.Errorf(line, "X", "Pre-Configuration Command Failed! Aborting futher tasks for this server..")
-		return
+	preCmds := job.SpecList.PreCmds(job.SpecName)
+	for _, preCmd := range preCmds {
+		job.Responses <- fmt.Sprintf(line, " ", "Running pre-configuration command: ["+preCmd+"]")
+		_, err := job.runCommand(preCmd, "pre-configuration")
+		if err != nil {
+			job.Errors <- err
+			job.Errors <- fmt.Errorf(line, "X", "pre-configuration command: ["+preCmd+"] Failed! Aborting futher tasks for this server..")
+			return
+		}
+		job.Responses <- fmt.Sprintf(line, "✓", "pre-configuration command: ["+preCmd+"]  Succeeded!")
 	}
-	job.Responses <- fmt.Sprintf(line, "✓", "Pre-Configuration Command Succeeded!")
 
 	// Run Apt-Get Commands
-	aptCmd := job.SpecList.AptGetCmd(job.SpecName)
-	job.Responses <- fmt.Sprintf(line, "*", "Running apt-get Command...")
-	err = job.runCommand(aptCmd, "apt-get")
-	if err != nil {
-		job.Errors <- fmt.Errorf(line, "X", "Command apt-get Failed! Aborting futher tasks for this server..")
-		return
+	aptCmds := job.SpecList.AptGetCmds(job.SpecName)
+	for _, aptCmd := range aptCmds {
+		job.Responses <- fmt.Sprintf(line, " ", "Running apt-get command: ["+aptCmd+"]")
+		_, err := job.runCommand(aptCmd, "apt-get")
+		if err != nil {
+			job.Errors <- err
+			job.Errors <- fmt.Errorf(line, "X", "apt-get command: ["+aptCmd+"] Failed! Aborting futher tasks for this server..")
+			return
+		}
+		job.Responses <- fmt.Sprintf(line, "✓", "apt-get command: ["+aptCmd+"] Succeeded!")
 	}
-	job.Responses <- fmt.Sprintf(line, "✓", "Command apt-get Succeeded!")
 
 	// Transfer any files we need to transfer
 	fileList := job.SpecList.DebianFileTransferList(job.SpecName)
-	job.Responses <- fmt.Sprintf(line, "*", "Starting file copy...")
-	err = job.transferFiles(fileList, "Configuration and Content Files")
-	if err != nil {
-		job.Errors <- fmt.Errorf(line, "X", "File Copy Failed! Aborting futher tasks for this server..")
-		return
+	if len(*fileList) > 0 {
+		job.Responses <- fmt.Sprintf(line, " ", "Starting file copy...")
+		err := job.transferFiles(fileList, "Configuration and Content Files")
+		if err != nil {
+			job.Errors <- fmt.Errorf(line, "X", "File Copy Failed! Aborting futher tasks for this server..")
+			return
+		}
+		job.Responses <- fmt.Sprintf(line, "✓", "File Copy Succeeded!")
 	}
-	job.Responses <- fmt.Sprintf(line, "✓", "File Copt Succeeded!")
 
 	// Run post configure commands
-	postCmd := job.SpecList.PostCmd(job.SpecName)
-	job.Responses <- fmt.Sprintf(line, "*", "Running Post-Configuration Command...")
-	err = job.runCommand(postCmd, "Post-Configuration")
-	if err != nil {
-		job.Errors <- fmt.Errorf(line, "X", "Post-Configuration Command Failed!")
+	postCmds := job.SpecList.PostCmds(job.SpecName)
+	for _, postCmd := range postCmds {
+		job.Responses <- fmt.Sprintf(line, " ", "Running post-configuration command: ["+postCmd+"]")
+		_, err := job.runCommand(postCmd, "post-configuration")
+		if err != nil {
+			job.Errors <- err
+			job.Errors <- fmt.Errorf(line, "X", "post-configuration command: ["+postCmd+"] Failed!")
+		}
+		job.Responses <- fmt.Sprintf(line, "✓", "post-configuration command: ["+postCmd+"] Succeeded!")
 	}
-	job.Responses <- fmt.Sprintf(line, "✓", "Post-Configuration Command Succeeded!")
 
 	// End of the line
 }
 
-func (j *LocalJob) runCommand(command string, name string) error {
+func (j *LocalJob) runCommand(command string, name string) (string, error) {
 
 	if len(command) > 0 {
-
 		parts := strings.Fields(command)
 		cmd := exec.Command(parts[0], parts[1:]...)
 
@@ -369,13 +376,10 @@ func (j *LocalJob) runCommand(command string, name string) error {
 
 		err := cmd.Run()
 
-		//j.Responses <- stdoutBuf.String() // TODO handle more verbose output, maybe from a verbose cli flag
-
-		return err
-
+		return stdoutBuf.String(), err
 	}
 
-	return nil
+	return "empty command!", nil
 
 }
 
@@ -390,7 +394,7 @@ func (j *LocalJob) transferFiles(fileList *FileTransfers, name string) error {
 
 		// Make our temp folder
 		j.runCommand("mkdir -p /tmp/crusher/"+file.Folder, "")
-		err := j.runCommand("sudo mkdir -p "+file.Folder, "") // should prob add chown and chmod to the config structs to set it afterwards
+		_, err := j.runCommand("sudo mkdir -p "+file.Folder, "") // should prob add chown and chmod to the config structs to set it afterwards
 		if err != nil {
 			j.Errors <- fmt.Errorf(line, "X", "Unable to make directory: "+file.Folder)
 			return err
@@ -465,9 +469,9 @@ var SpecTemplate = `{{range $name, $spec := .Specs}}
 	{{ ansi "bright"}}{{ ansi "fgwhite"}}         Content Source: {{ ansi ""}}{{ ansi "fgcyan"}}{{ $spec.Content.Source }}{{ ansi ""}}
 	{{ ansi "bright"}}{{ ansi "fgwhite"}}    Debian Content Root: {{ ansi ""}}{{ ansi "fgcyan"}}{{ $spec.Content.DebianRoot }}{{ ansi ""}}
 
-	{{ ansi "bright"}}{{ ansi "fgwhite"}}  Pre-configure Command: {{ ansi ""}}{{ ansi "fgcyan"}}{{ range $spec.Commands.Pre }}{{ printf "%s" . }}
+	{{ ansi "bright"}}{{ ansi "fgwhite"}}  Pre-configure command: {{ ansi ""}}{{ ansi "fgcyan"}}{{ range $spec.Commands.Pre }}{{ printf "%s" . }}
 				 {{ end }}{{ ansi ""}}
-	{{ ansi "bright"}}{{ ansi "fgwhite"}} Post-configure Command: {{ ansi ""}}{{ ansi "fgcyan"}}{{ range $spec.Commands.Post }}{{ printf "%s" . }}
+	{{ ansi "bright"}}{{ ansi "fgwhite"}} Post-configure command: {{ ansi ""}}{{ ansi "fgcyan"}}{{ range $spec.Commands.Post }}{{ printf "%s" . }}
 				 {{ end }}{{ ansi ""}}
 
 
@@ -476,7 +480,7 @@ var SpecTemplate = `{{range $name, $spec := .Specs}}
 {{ end }}
 `
 
-// Recursive unexported func for PreCmd
+// Recursive unexported func for PreCmds
 func (s *SpecList) getPreCommands(specName string) []string {
 	// The requested spec
 	spec := s.Specs[specName]
@@ -495,14 +499,15 @@ func (s *SpecList) getPreCommands(specName string) []string {
 	// Loop through this specs requirements to all other pre configure commands we need
 	for _, reqSpec := range spec.Requires {
 		if reqSpec != "" {
-			commands = append(commands, s.getPreCommands(reqSpec)...)
+			//commands = append(commands, s.getPreCommands(reqSpec)...)
+			commands = append(s.getPreCommands(reqSpec), commands...)
 		}
 	}
 
 	return commands
 }
 
-// Recursive unexported func for PostCmd
+// Recursive unexported func for PostCmds
 func (s *SpecList) getPostCommands(specName string) []string {
 	// The requested spec
 	spec := s.Specs[specName]
@@ -521,13 +526,13 @@ func (s *SpecList) getPostCommands(specName string) []string {
 
 	// Loop through this specs requirements to all other post configure commands we need
 	for _, reqSpec := range spec.Requires {
-		commands = append(commands, s.getPostCommands(reqSpec)...)
+		commands = append(s.getPostCommands(reqSpec), commands...)
 	}
 
 	return commands
 }
 
-// Recursive unexported func for AptGetCmd
+// Recursive unexported func for AptGetCmds
 func (s *SpecList) getAptPackages(specName string) []string {
 	// The requested spec
 	spec := s.Specs[specName]
@@ -541,7 +546,7 @@ func (s *SpecList) getAptPackages(specName string) []string {
 
 	// Loop through this specs requirements gather to all other apt-get packages we need
 	for _, reqSpec := range spec.Requires {
-		packages = append(packages, s.getAptPackages(reqSpec)...)
+		packages = append(s.getAptPackages(reqSpec), packages...)
 	}
 
 	return packages

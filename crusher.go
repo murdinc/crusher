@@ -17,7 +17,7 @@ func main() {
 	app := cli.NewApp()
 	app.Name = "crusher"
 	app.Usage = "Command Line Configuration Management System"
-	app.Version = "1.1"
+	app.Version = "1.1.1"
 	app.Author = "Ahmad Abdo"
 	app.Email = "send@ahmad.pizza"
 

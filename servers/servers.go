@@ -227,25 +227,29 @@ func (job *RemoteJob) Run() {
 	////////////////..........
 
 	// Run pre configure commands
-	preCmd := job.SpecList.PreCmd(job.SpecName)
-	job.Responses <- fmt.Sprintf(line, "*", "Running Pre-Configuration Command...")
-	err = job.runCommand(preCmd, "Pre-Configuration")
-	if err != nil {
-		job.Errors <- fmt.Errorf(line, "X", "Pre-Configuration Command Failed! Aborting futher tasks for this server..")
-		job.Errors <- fmt.Errorf("Error: %s", err)
-		return
+	preCmds := job.SpecList.PreCmds(job.SpecName)
+	for _, preCmd := range preCmds {
+		job.Responses <- fmt.Sprintf(line, "*", "Running Pre-Configuration Command...")
+		err = job.runCommand(preCmd, "Pre-Configuration")
+		if err != nil {
+			job.Errors <- fmt.Errorf(line, "X", "Pre-Configuration Command Failed! Aborting futher tasks for this server..")
+			job.Errors <- fmt.Errorf("Error: %s", err)
+			return
+		}
+		job.Responses <- fmt.Sprintf(line, "✓", "Pre-Configuration Command Succeeded!")
 	}
-	job.Responses <- fmt.Sprintf(line, "✓", "Pre-Configuration Command Succeeded!")
 
 	// Run Apt-Get Commands
-	aptCmd := job.SpecList.AptGetCmd(job.SpecName)
+	aptCmds := job.SpecList.AptGetCmds(job.SpecName)
 	job.Responses <- fmt.Sprintf(line, "*", "Running apt-get Command...")
-	err = job.runCommand(aptCmd, "apt-get")
-	if err != nil {
-		job.Errors <- fmt.Errorf(line, "X", "Command apt-get Failed! Aborting futher tasks for this server..")
-		return
+	for _, aptCmd := range aptCmds {
+		err = job.runCommand(aptCmd, "apt-get")
+		if err != nil {
+			job.Errors <- fmt.Errorf(line, "X", "Command apt-get Failed! Aborting futher tasks for this server..")
+			return
+		}
+		job.Responses <- fmt.Sprintf(line, "✓", "Command apt-get Succeeded!")
 	}
-	job.Responses <- fmt.Sprintf(line, "✓", "Command apt-get Succeeded!")
 
 	// Transfer any files we need to transfer
 	fileList := job.SpecList.DebianFileTransferList(job.SpecName)
@@ -258,13 +262,15 @@ func (job *RemoteJob) Run() {
 	job.Responses <- fmt.Sprintf(line, "✓", "File Transfer Succeeded!")
 
 	// Run post configure commands
-	postCmd := job.SpecList.PostCmd(job.SpecName)
-	job.Responses <- fmt.Sprintf(line, "*", "Running Post-Configuration Command...")
-	err = job.runCommand(postCmd, "Post-Configuration")
-	if err != nil {
-		job.Errors <- fmt.Errorf(line, "X", "Post-Configuration Command Failed!")
+	postCmds := job.SpecList.PostCmds(job.SpecName)
+	for _, postCmd := range postCmds {
+		job.Responses <- fmt.Sprintf(line, "*", "Running Post-Configuration Command...")
+		err = job.runCommand(postCmd, "Post-Configuration")
+		if err != nil {
+			job.Errors <- fmt.Errorf(line, "X", "Post-Configuration Command Failed!")
+		}
+		job.Responses <- fmt.Sprintf(line, "✓", "Post-Configuration Command Succeeded!")
 	}
-	job.Responses <- fmt.Sprintf(line, "✓", "Post-Configuration Command Succeeded!")
 
 	// End of the line
 }

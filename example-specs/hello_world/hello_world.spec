@@ -16,9 +16,9 @@ REQUIRES = nginx, php
 	source = spec
 	# source = git
 	# git_command = git clone ...
-	debian_root = "/usr/share/nginx/html/"
+	debian_root = "/var/www/html/"
 
 [COMMANDS]
 
-	post = "sudo service nginx start, sudo service php5-fpm start, sudo service nginx reload"
+	post = "sudo service nginx reload, sudo service php7.0-fpm reload"
 
