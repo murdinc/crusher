@@ -2,7 +2,7 @@ package specr
 
 import (
 	"bytes"
-	"fmt"
+	"errors"
 	"os"
 	"os/exec"
 	"os/user"
@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/hashicorp/hil"
+	"github.com/hashicorp/hil/ast"
 	"github.com/murdinc/terminal"
 	"github.com/olekukonko/tablewriter"
 
@@ -74,11 +76,17 @@ type FileTransfer struct {
 
 // Jobs that run locally
 type LocalJob struct {
-	Responses chan string
-	Errors    chan error
-	SpecName  string
-	SpecList  *SpecList
-	WaitGroup *sync.WaitGroup
+	Class       string
+	Sequence    string
+	Locale      string
+	Deltas      chan string
+	Notices     chan string
+	Responses   chan string
+	Information chan string
+	Errors      chan error
+	SpecName    string
+	SpecList    *SpecList
+	WaitGroup   *sync.WaitGroup
 }
 
 type FileTransfers []FileTransfer
@@ -271,21 +279,31 @@ var SpecBuildTemplate = `
 `
 
 // Run Local configuration on this machine
-func (s *SpecList) LocalConfigure(specName string) {
+func (s *SpecList) LocalConfigure(specName, class, sequence, locale string) {
 	// Doesn't really need to use a goroutine now, but maybe we want to run tasks concurrently in the future?
 
 	var wg sync.WaitGroup
 	wg.Add(1)
 
+	deltas := make(chan string, 10)
+	notices := make(chan string, 10)
 	responses := make(chan string, 10)
+	information := make(chan string, 10)
 	errors := make(chan error, 10)
 
 	job := LocalJob{
-		Responses: responses,
-		Errors:    errors,
-		SpecName:  specName,
-		SpecList:  s,
-		WaitGroup: &wg}
+		Deltas:      deltas,
+		Notices:     notices,
+		Responses:   responses,
+		Information: information,
+		Errors:      errors,
+		SpecName:    specName,
+		SpecList:    s,
+		WaitGroup:   &wg,
+		Class:       class,
+		Sequence:    sequence,
+		Locale:      locale,
+	}
 
 	// Launch it!
 	go job.Run()
@@ -294,8 +312,14 @@ func (s *SpecList) LocalConfigure(specName string) {
 	go func() {
 		for {
 			select {
+			case delta := <-deltas:
+				terminal.Delta(delta)
+			case notice := <-notices:
+				terminal.Notice(notice)
 			case resp := <-responses:
 				terminal.Response(resp)
+			case info := <-information:
+				terminal.Information(info)
 			case err := <-errors:
 				terminal.ErrorLine(err.Error())
 			}
@@ -310,56 +334,55 @@ func (s *SpecList) LocalConfigure(specName string) {
 func (job *LocalJob) Run() {
 	defer job.WaitGroup.Done()
 
-	line := addSpaces("[%s] [local-configure]", 35) + " >> %s " // status, message
-
 	// Run pre configure commands
 	preCmds := job.SpecList.PreCmds(job.SpecName)
 	for _, preCmd := range preCmds {
-		job.Responses <- fmt.Sprintf(line, " ", "Running pre-configuration command: ["+preCmd+"]")
+		job.Deltas <- "Running pre-configuration command: [" + preCmd + "]"
 		_, err := job.runCommand(preCmd, "pre-configuration")
 		if err != nil {
 			job.Errors <- err
-			job.Errors <- fmt.Errorf(line, "X", "pre-configuration command: ["+preCmd+"] Failed! Aborting futher tasks for this server..")
+			job.Errors <- errors.New("pre-configuration command: [" + preCmd + "] Failed! Aborting futher tasks for this server..")
+
 			return
 		}
-		job.Responses <- fmt.Sprintf(line, "✓", "pre-configuration command: ["+preCmd+"]  Succeeded!")
+		job.Information <- "pre-configuration command: [" + preCmd + "] Succeeded!"
 	}
 
 	// Run Apt-Get Commands
 	aptCmds := job.SpecList.AptGetCmds(job.SpecName)
 	for _, aptCmd := range aptCmds {
-		job.Responses <- fmt.Sprintf(line, " ", "Running apt-get command: ["+aptCmd+"]")
+		job.Deltas <- "Running apt-get command: [" + aptCmd + "]"
 		_, err := job.runCommand(aptCmd, "apt-get")
 		if err != nil {
 			job.Errors <- err
-			job.Errors <- fmt.Errorf(line, "X", "apt-get command: ["+aptCmd+"] Failed! Aborting futher tasks for this server..")
+			job.Errors <- errors.New("apt-get command: [" + aptCmd + "] Failed! Aborting futher tasks for this server..")
 			return
 		}
-		job.Responses <- fmt.Sprintf(line, "✓", "apt-get command: ["+aptCmd+"] Succeeded!")
+		job.Information <- "apt-get command: [" + aptCmd + "] Succeeded!"
 	}
 
 	// Transfer any files we need to transfer
 	fileList := job.SpecList.DebianFileTransferList(job.SpecName)
 	if len(*fileList) > 0 {
-		job.Responses <- fmt.Sprintf(line, " ", "Starting file copy...")
+		job.Deltas <- "Starting file copy..."
 		err := job.transferFiles(fileList, "Configuration and Content Files")
 		if err != nil {
-			job.Errors <- fmt.Errorf(line, "X", "File Copy Failed! Aborting futher tasks for this server..")
+			job.Errors <- errors.New("File Copy Failed! Aborting futher tasks for this server..")
 			return
 		}
-		job.Responses <- fmt.Sprintf(line, "✓", "File Copy Succeeded!")
+		job.Information <- "File Copy Succeeded!"
 	}
 
 	// Run post configure commands
 	postCmds := job.SpecList.PostCmds(job.SpecName)
 	for _, postCmd := range postCmds {
-		job.Responses <- fmt.Sprintf(line, " ", "Running post-configuration command: ["+postCmd+"]")
+		job.Deltas <- "Running post-configuration command: [" + postCmd + "]"
 		_, err := job.runCommand(postCmd, "post-configuration")
 		if err != nil {
 			job.Errors <- err
-			job.Errors <- fmt.Errorf(line, "X", "post-configuration command: ["+postCmd+"] Failed!")
+			job.Errors <- errors.New("post-configuration command: [" + postCmd + "] Failed!")
 		}
-		job.Responses <- fmt.Sprintf(line, "✓", "post-configuration command: ["+postCmd+"] Succeeded!")
+		job.Information <- "post-configuration command: [" + postCmd + "] Succeeded!"
 	}
 
 	// End of the line
@@ -385,8 +408,6 @@ func (j *LocalJob) runCommand(command string, name string) (string, error) {
 
 func (j *LocalJob) transferFiles(fileList *FileTransfers, name string) error {
 
-	line := addSpaces("[%s] [local-configure]", 35) + " >> %s " // status, message
-
 	// Defer cleanup
 	defer j.runCommand("sudo rm -rf /tmp/crusher/*", "")
 
@@ -396,24 +417,24 @@ func (j *LocalJob) transferFiles(fileList *FileTransfers, name string) error {
 		j.runCommand("mkdir -p /tmp/crusher/"+file.Folder, "")
 		_, err := j.runCommand("sudo mkdir -p "+file.Folder, "") // should prob add chown and chmod to the config structs to set it afterwards
 		if err != nil {
-			j.Errors <- fmt.Errorf(line, "X", "Unable to make directory: "+file.Folder)
+			j.Errors <- errors.New("Unable to make directory: " + file.Folder)
 			return err
 		}
 
-		j.Responses <- fmt.Sprintf(line, "*", "Copying file: "+file.Destination)
+		j.Responses <- "Copying file: " + file.Destination
 
 		// Read the file
 		////////////////..........
 		rf, err := os.Open(file.Source)
 		defer rf.Close()
 		if err != nil {
-			j.Errors <- fmt.Errorf(line, "X", "Unable to open file: "+file.Source)
+			j.Errors <- errors.New("Unable to open file: " + file.Source)
 			return err
 		}
 
 		rfi, err := rf.Stat()
 		if err != nil {
-			j.Errors <- fmt.Errorf(line, "X", "Unable to inspect file: "+file.Source)
+			j.Errors <- errors.New("Unable to inspect file: " + file.Source)
 			return err
 		}
 
@@ -422,9 +443,43 @@ func (j *LocalJob) transferFiles(fileList *FileTransfers, name string) error {
 
 		_, err = rf.Read(fileBytes)
 		if err != nil {
-			j.Errors <- fmt.Errorf(line, "X", "Unable to read file: "+file.Source)
+			j.Errors <- errors.New("Unable to read file: " + file.Source)
 			return err
 		}
+
+		// Interpolate
+		////////////////..........
+		tree, err := hil.Parse(string(fileBytes))
+
+		if err != nil {
+			return err
+		}
+
+		config := &hil.EvalConfig{
+			GlobalScope: &ast.BasicScope{
+				VarMap: map[string]ast.Variable{
+					"var.class": ast.Variable{
+						Type:  ast.TypeString,
+						Value: j.Class,
+					},
+					"var.sequence": ast.Variable{
+						Type:  ast.TypeString,
+						Value: j.Sequence,
+					},
+					"var.locale": ast.Variable{
+						Type:  ast.TypeString,
+						Value: j.Locale,
+					},
+				},
+			},
+		}
+
+		result, err := hil.Eval(tree, config)
+		if err != nil {
+			return err
+		}
+
+		parsedFile := []byte(result.Value.(string))
 
 		// Write the file
 		////////////////..........
@@ -432,18 +487,18 @@ func (j *LocalJob) transferFiles(fileList *FileTransfers, name string) error {
 		defer rf.Close()
 
 		if err != nil {
-			j.Errors <- fmt.Errorf(line, "X", "Unable to create file: "+file.Destination)
+			j.Errors <- errors.New("Unable to create file: " + file.Destination)
 			return err
 		}
-		if _, err := rf.Write(fileBytes); err != nil {
-			j.Errors <- fmt.Errorf(line, "X", "Unable to write file: "+file.Destination)
+		if _, err := rf.Write(parsedFile); err != nil {
+			j.Errors <- errors.New("Unable to write file: " + file.Destination)
 			return err
 		}
 
 		// mv
 		j.runCommand("sudo mv /tmp/crusher"+file.Destination+" "+file.Destination, "")
 
-		j.Responses <- fmt.Sprintf(line, "✓", "Completed copy of file: "+file.Destination)
+		j.Information <- "Completed copy of file: " + file.Destination
 	}
 
 	return nil
@@ -499,8 +554,7 @@ func (s *SpecList) getPreCommands(specName string) []string {
 	// Loop through this specs requirements to all other pre configure commands we need
 	for _, reqSpec := range spec.Requires {
 		if reqSpec != "" {
-			//commands = append(commands, s.getPreCommands(reqSpec)...)
-			commands = append(s.getPreCommands(reqSpec), commands...)
+			commands = append(s.getPreCommands(reqSpec), commands...) // prepend
 		}
 	}
 
@@ -526,7 +580,7 @@ func (s *SpecList) getPostCommands(specName string) []string {
 
 	// Loop through this specs requirements to all other post configure commands we need
 	for _, reqSpec := range spec.Requires {
-		commands = append(commands, s.getPostCommands(reqSpec)...)
+		commands = append(s.getPostCommands(reqSpec), commands...) // prepend
 	}
 
 	return commands

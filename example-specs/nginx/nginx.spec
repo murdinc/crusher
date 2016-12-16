@@ -13,7 +13,6 @@ REQUIRES =
 	debian_root = "/etc/"
 
 [COMMANDS]
-
 	post = "sudo service nginx start, sudo service nginx reload"
 
 

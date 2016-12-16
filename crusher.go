@@ -14,12 +14,17 @@ import (
 ////////////////..........
 func main() {
 
+	var class string
+	var sequence string
+	var locale string
+
 	app := cli.NewApp()
 	app.Name = "crusher"
 	app.Usage = "Command Line Configuration Management System"
 	app.Version = "1.1.1"
 	app.Author = "Ahmad Abdo"
 	app.Email = "send@ahmad.pizza"
+	app.EnableBashCompletion = true
 
 	app.Commands = []cli.Command{
 		{
@@ -62,6 +67,23 @@ func main() {
 			Arguments: []cli.Argument{
 				cli.Argument{Name: "spec", Description: "The spec to configure on this machine", Optional: false},
 			},
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:        "class",
+					Destination: &class,
+					Usage:       "server class",
+				},
+				cli.StringFlag{
+					Name:        "sequence",
+					Destination: &sequence,
+					Usage:       "server sequence",
+				},
+				cli.StringFlag{
+					Name:        "locale",
+					Destination: &locale,
+					Usage:       "server location",
+				},
+			},
 			Action: func(c *cli.Context) error {
 				specList, err := specr.GetSpecs()
 				if err != nil {
@@ -75,7 +97,7 @@ func main() {
 					return nil
 				}
 
-				specList.LocalConfigure(specName)
+				specList.LocalConfigure(specName, c.String("class"), c.String("sequence"), c.String("locale"))
 				return nil
 			},
 		},

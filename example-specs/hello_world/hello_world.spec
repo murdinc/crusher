@@ -4,7 +4,7 @@
 NAME = hello_world
 
 VERSION = 1
-REQUIRES = php, nginx
+REQUIRES = nginx, php
 
 [PACKAGES]
 	# NONE

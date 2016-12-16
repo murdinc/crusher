@@ -15,7 +15,7 @@ REQUIRES =
 	source = spec
 	# source = git
 	# git_command = git clone ...
-	debian_root = "/usr/share/nginx/html/"
+	debian_root = "/var/log/"
 
 [COMMANDS]
 
