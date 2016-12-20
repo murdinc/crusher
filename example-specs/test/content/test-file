@@ -1,1 +1,4 @@
-${var.class} ${var.sequence} ${var.locale}
+Spec Name: ${var.specname}
+Class: ${var.class}
+Sequence: ${var.sequence}
+Locale: ${var.locale}

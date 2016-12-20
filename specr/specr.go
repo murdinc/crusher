@@ -449,6 +449,7 @@ func (j *LocalJob) transferFiles(fileList *FileTransfers, name string) error {
 
 		// Interpolate
 		////////////////..........
+		if file.
 		tree, err := hil.Parse(string(fileBytes))
 
 		if err != nil {
@@ -469,6 +470,10 @@ func (j *LocalJob) transferFiles(fileList *FileTransfers, name string) error {
 					"var.locale": ast.Variable{
 						Type:  ast.TypeString,
 						Value: j.Locale,
+					},
+					"var.specname": ast.Variable{
+						Type:  ast.TypeString,
+						Value: j.SpecName,
 					},
 				},
 			},
