@@ -449,7 +449,6 @@ func (j *LocalJob) transferFiles(fileList *FileTransfers, name string) error {
 
 		// Interpolate
 		////////////////..........
-		if file.
 		tree, err := hil.Parse(string(fileBytes))
 
 		if err != nil {
