@@ -19,24 +19,8 @@ To use this tool, you must have the ability to ssh to a host, have permission to
 compile **crusher** and put it at the base of a git repo containing your spec files. New servers can be launched with a script to check out your repo and run crushers `local-configure` command to configure themselves.
 
 ## Installation
-1. Install Go (if you haven't already): https://golang.org/doc/install
-
-2. Download and install crusher:
-
-  `$ go get -u github.com/murdinc/crusher`
-
-3. If `$GOPATH/bin` is not yet in your `$PATH` (check with `$ echo $PATH`):
-
-  `$ export PATH="$PATH:$GOPATH/bin"`
-
-4. Test it! `$ go test github.com/murdinc/crusher/...`
-
 ```
-$ go test github.com/murdinc/crusher/...
-ok  	github.com/murdinc/crusher	0.010s
-ok  	github.com/murdinc/crusher/config	0.011s
-ok  	github.com/murdinc/crusher/servers	0.011s
-ok  	github.com/murdinc/crusher/specr	0.013s
+curl -s http://dl.sudoba.sh/get/crusher | sh
 ```
 
 ## Commands
@@ -117,7 +101,7 @@ This example spec installs nginx and php5-fpm, and serves "Hello World!" from po
 This was a code challenge, and I for some reason immediately thought of the scenario of Wesley Crusher adding a set of commands to the ships computers to automate the set-up new warp engines. Also I needed to call it something.
 
 ## Tests
-There is a very basic test for each of the sub-packages, I hope to expand those after moving the Jobs code into its own sub-package. Running `$ go test github.com/murdinc/crusher/...` will run all tests for this project. 
+There is a very basic test for each of the sub-packages, I hope to expand those after moving the Jobs code into its own sub-package. Running `$ go test github.com/murdinc/crusher/...` will run all tests for this project.
 
 ```
 $ go test github.com/murdinc/crusher/...

@@ -43,7 +43,8 @@ type Packages struct {
 }
 
 type Configs struct {
-	DebianRoot string `ini:"debian_root"`
+	DebianRoot      string `ini:"debian_root"`
+	SkipInterpolate bool   `ini:"skip_interpolate"`
 }
 
 type Content struct {
@@ -72,6 +73,7 @@ type FileTransfer struct {
 	Folder      string
 	Chown       string
 	Chmod       string
+	Interpolate bool
 }
 
 // Jobs that run locally
@@ -160,7 +162,7 @@ func (s *SpecList) SpecExists(spec string) bool {
 func (s *SpecList) AptGetCmds(specName string) (cmds []string) {
 	packages := s.getAptPackages(specName)
 	if len(packages) > 0 {
-		cmds = []string{"sudo apt-get update", "sudo apt-get install -y " + strings.Join(packages, " ")}
+		cmds = []string{"sudo apt-get update", "sudo apt-get install -y --allow-unauthenticated " + strings.Join(packages, " ")}
 	}
 
 	return cmds
@@ -200,6 +202,10 @@ func (s *SpecList) getDebianFileTransfers(specName string) *FileTransfers {
 	////////////////..........
 	srcConfFolder := spec.SpecRoot + "/configs/"
 	destConfFolder := spec.Configs.DebianRoot
+	interpolate := true
+	if spec.Configs.SkipInterpolate == true {
+		interpolate = false
+	}
 
 	if spec.Configs.DebianRoot != "" {
 		// Walk the Configs folder and append each file
@@ -210,6 +216,7 @@ func (s *SpecList) getDebianFileTransfers(specName string) *FileTransfers {
 					Source:      path,
 					Destination: destination,
 					Folder:      filepath.Dir(destination),
+					Interpolate: interpolate,
 				})
 			}
 			return
@@ -342,7 +349,6 @@ func (job *LocalJob) Run() {
 		if err != nil {
 			job.Errors <- err
 			job.Errors <- errors.New("pre-configuration command: [" + preCmd + "] Failed! Aborting futher tasks for this server..")
-
 			return
 		}
 		job.Information <- "pre-configuration command: [" + preCmd + "] Succeeded!"
@@ -381,8 +387,9 @@ func (job *LocalJob) Run() {
 		if err != nil {
 			job.Errors <- err
 			job.Errors <- errors.New("post-configuration command: [" + postCmd + "] Failed!")
+		} else {
+			job.Information <- "post-configuration command: [" + postCmd + "] Succeeded!"
 		}
-		job.Information <- "post-configuration command: [" + postCmd + "] Succeeded!"
 	}
 
 	// End of the line
@@ -447,43 +454,56 @@ func (j *LocalJob) transferFiles(fileList *FileTransfers, name string) error {
 			return err
 		}
 
-		// Interpolate
-		////////////////..........
-		tree, err := hil.Parse(string(fileBytes))
+		var outputFile []byte
 
-		if err != nil {
-			return err
-		}
+		if file.Interpolate {
 
-		config := &hil.EvalConfig{
-			GlobalScope: &ast.BasicScope{
-				VarMap: map[string]ast.Variable{
-					"var.class": ast.Variable{
-						Type:  ast.TypeString,
-						Value: j.Class,
-					},
-					"var.sequence": ast.Variable{
-						Type:  ast.TypeString,
-						Value: j.Sequence,
-					},
-					"var.locale": ast.Variable{
-						Type:  ast.TypeString,
-						Value: j.Locale,
-					},
-					"var.specname": ast.Variable{
-						Type:  ast.TypeString,
-						Value: j.SpecName,
+			j.Deltas <- "Interpolating on file: " + file.Destination
+
+			// Interpolate
+			////////////////..........
+			tree, err := hil.Parse(string(fileBytes))
+			if err != nil {
+				j.Errors <- errors.New("Unable to parse file: " + file.Source)
+				return err
+			}
+
+			config := &hil.EvalConfig{
+				GlobalScope: &ast.BasicScope{
+					VarMap: map[string]ast.Variable{
+						"var.class": ast.Variable{
+							Type:  ast.TypeString,
+							Value: j.Class,
+						},
+						"var.sequence": ast.Variable{
+							Type:  ast.TypeString,
+							Value: j.Sequence,
+						},
+						"var.locale": ast.Variable{
+							Type:  ast.TypeString,
+							Value: j.Locale,
+						},
+						"var.specname": ast.Variable{
+							Type:  ast.TypeString,
+							Value: j.SpecName,
+						},
 					},
 				},
-			},
-		}
+			}
 
-		result, err := hil.Eval(tree, config)
-		if err != nil {
-			return err
-		}
+			result, err := hil.Eval(tree, config)
+			if err != nil {
+				j.Errors <- errors.New("Unable to evaluate file: " + file.Source)
+				return err
+			}
 
-		parsedFile := []byte(result.Value.(string))
+			outputFile = []byte(result.Value.(string))
+		} else {
+
+			j.Notices <- "Skipping Interpolation on file: " + file.Destination
+
+			outputFile = fileBytes
+		}
 
 		// Write the file
 		////////////////..........
@@ -494,7 +514,7 @@ func (j *LocalJob) transferFiles(fileList *FileTransfers, name string) error {
 			j.Errors <- errors.New("Unable to create file: " + file.Destination)
 			return err
 		}
-		if _, err := rf.Write(parsedFile); err != nil {
+		if _, err := rf.Write(outputFile); err != nil {
 			j.Errors <- errors.New("Unable to write file: " + file.Destination)
 			return err
 		}
@@ -584,7 +604,8 @@ func (s *SpecList) getPostCommands(specName string) []string {
 
 	// Loop through this specs requirements to all other post configure commands we need
 	for _, reqSpec := range spec.Requires {
-		commands = append(s.getPostCommands(reqSpec), commands...) // prepend
+		//commands = append(s.getPostCommands(reqSpec), commands...) // prepend
+		commands = append(commands, s.getPostCommands(reqSpec)...) // append
 	}
 
 	return commands
