@@ -71,8 +71,8 @@ By default, **crusher** will look for Specs in the following directories, in ord
 
 1. $GOPATH/src/github.com/murdinc/crusher/example-specs/
 2. /etc/crusher/specs/
-3. ./specs/
-4. ~/crusher/specs/
+3. ~/crusher/specs/
+4. ./specs/
 
 Running a Spec against a server looks a little like this:
 

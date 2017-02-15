@@ -104,12 +104,11 @@ func GetSpecs() (*SpecList, error) {
 	candidates := []string{
 		os.Getenv("GOPATH") + "/src/github.com/murdinc/crusher/example-specs/",
 		"/etc/crusher/specs/",
-		"./specs/",
 		currentUser.HomeDir + "/crusher/specs/",
+		"./specs/",
 	}
 
 	walkFn := func(path string, fileInfo os.FileInfo, inErr error) (err error) {
-		//fmt.Printf("%v\n", fileInfo.Name())
 		if inErr == nil && !fileInfo.IsDir() && strings.HasSuffix(strings.ToLower(fileInfo.Name()), ".spec") {
 			err = specList.scanFile(path)
 		}
@@ -582,6 +581,16 @@ func (s *SpecList) getPreCommands(specName string) []string {
 		}
 	}
 
+	// Dedupe, remove later ones
+	for index := 0; index < len(commands); index++ {
+		for compare := index + 1; compare < len(commands); compare++ {
+			if commands[index] == commands[compare] {
+				commands = append(commands[:compare], commands[compare+1:]...)
+				compare--
+			}
+		}
+	}
+
 	return commands
 }
 
@@ -608,6 +617,16 @@ func (s *SpecList) getPostCommands(specName string) []string {
 		commands = append(commands, s.getPostCommands(reqSpec)...) // append
 	}
 
+	// Dedupe, remove earlier ones
+	for index := 0; index < len(commands); index++ {
+		for compare := index + 1; compare < len(commands); compare++ {
+			if commands[index] == commands[compare] {
+				commands = append(commands[:index], commands[index+1:]...)
+				index--
+			}
+		}
+	}
+
 	return commands
 }
 
@@ -620,12 +639,22 @@ func (s *SpecList) getAptPackages(specName string) []string {
 		return nil
 	}
 
-	// gather all required apt-get packages for this spec
+	// Gather all required apt-get packages for this spec
 	packages = append(packages, spec.Packages.AptGet...)
 
 	// Loop through this specs requirements gather to all other apt-get packages we need
 	for _, reqSpec := range spec.Requires {
 		packages = append(packages, s.getAptPackages(reqSpec)...)
+	}
+
+	// Dedupe
+	for index := 0; index < len(packages); index++ {
+		for compare := index + 1; compare < len(packages); compare++ {
+			if packages[index] == packages[compare] {
+				packages = append(packages[:compare], packages[compare+1:]...)
+				compare--
+			}
+		}
 	}
 
 	return packages
