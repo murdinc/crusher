@@ -161,7 +161,7 @@ func (s *SpecList) SpecExists(spec string) bool {
 func (s *SpecList) AptGetCmds(specName string) (cmds []string) {
 	packages := s.getAptPackages(specName)
 	if len(packages) > 0 {
-		cmds = []string{"sudo apt-get update", "sudo apt-get install -y --allow-unauthenticated " + strings.Join(packages, " ")}
+		cmds = []string{"sudo dpkg --configure -a", "sudo apt-get update", "sudo apt-get install -y --allow-unauthenticated " + strings.Join(packages, " ")}
 	}
 
 	return cmds
