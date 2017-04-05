@@ -161,7 +161,7 @@ func (s *SpecList) SpecExists(spec string) bool {
 func (s *SpecList) AptGetCmds(specName string) (cmds []string) {
 	packages := s.getAptPackages(specName)
 	if len(packages) > 0 {
-		cmds = []string{"sudo dpkg --configure -a", "sudo apt-get update", "sudo apt-get install -y --allow-unauthenticated " + strings.Join(packages, " ")}
+		cmds = []string{"sudo apt-get update -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\"", "sudo apt-get install -y -f --force-yes --allow-unauthenticated " + strings.Join(packages, " ")}
 	}
 
 	return cmds
@@ -400,10 +400,17 @@ func (j *LocalJob) runCommand(command string, name string) (string, error) {
 		parts := strings.Fields(command)
 		cmd := exec.Command(parts[0], parts[1:]...)
 
-		var stdoutBuf bytes.Buffer
+		var stdoutBuf, stderrBuf bytes.Buffer
 		cmd.Stdout = &stdoutBuf
+		cmd.Stderr = &stderrBuf
 
 		err := cmd.Run()
+
+		// TODO handle more verbose output, maybe from a verbose cli flag
+		if err != nil {
+			j.Responses <- stdoutBuf.String()
+			j.Responses <- stderrBuf.String()
+		}
 
 		return stdoutBuf.String(), err
 	}

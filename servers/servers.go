@@ -284,12 +284,17 @@ func (j *RemoteJob) runCommand(cmd string, name string) error {
 	}
 	defer session.Close()
 
-	var stdoutBuf bytes.Buffer
+	var stdoutBuf, stderrBuf bytes.Buffer
 	session.Stdout = &stdoutBuf
+	session.Stderr = &stderrBuf
 
 	err = session.Run(cmd)
 
-	//j.Responses <- stdoutBuf.String() // TODO handle more verbose output, maybe from a verbose cli flag
+	// TODO handle more verbose output, maybe from a verbose cli flag
+	if err != nil {
+		j.Responses <- stdoutBuf.String()
+		j.Responses <- stderrBuf.String()
+	}
 
 	return err
 
