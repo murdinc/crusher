@@ -625,11 +625,13 @@ func (s *SpecList) getPostCommands(specName string) []string {
 	}
 
 	// Dedupe, remove earlier ones
-	for index := 0; index < len(commands); index++ {
-		for compare := index + 1; compare < len(commands); compare++ {
+	length := len(commands)
+	for index := 0; index < length; index++ {
+		for compare := index + 1; compare < length-1; compare++ {
 			if commands[index] == commands[compare] {
 				commands = append(commands[:index], commands[index+1:]...)
 				index--
+				length--
 			}
 		}
 	}
