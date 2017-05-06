@@ -6,6 +6,16 @@
 ## Intro
 **crusher** is a minimalist configuration-management tool. It aims to provide much of the flexibility of the available off-the-shelf options, with as little overhead as possible.
 
+Crusher breaks down the configuration process into 5 basic pieces: 
+
+1. Pre-configuration Commands - commands you need to run before anything else (adding package repo's creating folders, etc.)
+2. Apt-Get Packages - installing necessary software packages
+3. Configuration Files - (/etc/ files)
+4. Content - (websites, data files)
+5. Post-configuration Commands - commands you need to run after everything else (restating services, reloading configuration files, etc.)
+
+This project started out as a code challenge as part of a job interview for Slack, but I liked it so much that I've kept it going. 
+
 ## Requirements
 To use this tool, you must have the ability to ssh to a host, have permission to write to the servers temp directory, and run commands with elevated privileges.
 
@@ -64,6 +74,25 @@ Example:
 
 ## What's a Spec?
 A `.spec` file (short for specification), along with its `config` and `content` folders, contain the building blocks of a server configuration. Specs contain a list of packages to install, configuration and content files along with their destinations, and commands to run during the configuration job.
+
+An example of a spec that installs php7:
+```
+NAME = php
+
+VERSION = 1
+REQUIRES =
+
+[PACKAGES]
+	apt_get = php7.0-fpm, php7.0-cli, php7.0-curl, php7.0-gd, php7.0-intl php7.0-mysql, php-memcache, php7.0-xml, php7.0-mbstring, php7.0-mcrypt, php7.0-xmlrpc
+
+[CONFIGS]
+	debian_root = "/etc/"
+	skip_interpolate = true
+
+[COMMANDS]
+	pre = "sudo chmod -R 775 ./specs/php/scripts/, sudo add-apt-repository -y ppa:ondrej/php"
+	post = "sudo service php7.0-fpm restart"
+```
 
 Specs can require other specs, to link smaller building blocks into more complex configurations. Check out `hello_word.spec` in the [example-specs](https://github.com/murdinc/crusher/tree/master/example-specs) folder for a simple example.
 
