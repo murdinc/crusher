@@ -161,7 +161,7 @@ func (s *SpecList) SpecExists(spec string) bool {
 func (s *SpecList) AptGetCmds(specName string) (cmds []string) {
 	packages := s.getAptPackages(specName)
 	if len(packages) > 0 {
-		cmds = []string{"sudo apt-get update -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\"", "sudo apt-get install -y -f --force-yes --allow-unauthenticated " + strings.Join(packages, " ")}
+		cmds = []string{"sudo apt-get update -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\"", "sudo apt-get install -y -f --assume-yes --allow-unauthenticated " + strings.Join(packages, " ")}
 	}
 
 	return cmds
