@@ -620,18 +620,30 @@ func (s *SpecList) getPostCommands(specName string) []string {
 
 	// Loop through this specs requirements to all other post configure commands we need
 	for _, reqSpec := range spec.Requires {
-		//commands = append(s.getPostCommands(reqSpec), commands...) // prepend
-		commands = append(commands, s.getPostCommands(reqSpec)...) // append
+		commands = append(s.getPostCommands(reqSpec), commands...) // prepend
+		//commands = append(commands, s.getPostCommands(reqSpec)...) // append
 	}
 
-	// Dedupe, remove earlier ones
-	length := len(commands)
-	for index := 0; index < length; index++ {
-		for compare := index + 1; compare < length-1; compare++ {
+	/*
+		// Dedupe, remove earlier ones
+		length := len(commands)
+		for index := 0; index < length; index++ {
+			for compare := index + 1; compare < length-1; compare++ {
+				if commands[index] == commands[compare] {
+					commands = append(commands[:index], commands[index+1:]...)
+					index--
+					length--
+				}
+			}
+		}
+	*/
+
+	// Dedupe, remove later ones
+	for index := 0; index < len(commands); index++ {
+		for compare := index + 1; compare < len(commands); compare++ {
 			if commands[index] == commands[compare] {
-				commands = append(commands[:index], commands[index+1:]...)
-				index--
-				length--
+				commands = append(commands[:compare], commands[compare+1:]...)
+				compare--
 			}
 		}
 	}
