@@ -39,7 +39,8 @@ type Spec struct {
 }
 
 type Packages struct {
-	AptGet []string `ini:"apt_get"`
+	AptGet       []string `ini:"apt_get"`
+	SkipPackages bool     `ini:"skip_packages"`
 }
 
 type Configs struct {
@@ -53,8 +54,10 @@ type Content struct {
 }
 
 type Commands struct {
-	Pre  []string `ini:"pre,omitempty"`
-	Post []string `ini:"post,omitempty"`
+	Pre      []string `ini:"pre,omitempty"`
+	Post     []string `ini:"post,omitempty"`
+	SkipPre  bool     `ini:"skip_pre"`
+	SkipPost bool     `ini:"skip_post"`
 }
 
 type SpecSummary struct {
@@ -570,7 +573,7 @@ func (s *SpecList) getPreCommands(specName string) []string {
 	// The requested spec
 	spec := s.Specs[specName]
 	var commands []string
-	if spec == nil {
+	if spec == nil || spec.Commands.SkipPre {
 		return nil
 	}
 
@@ -607,7 +610,7 @@ func (s *SpecList) getPostCommands(specName string) []string {
 	spec := s.Specs[specName]
 	var commands []string
 
-	if spec == nil {
+	if spec == nil || spec.Commands.SkipPost {
 		return nil
 	}
 
@@ -656,7 +659,7 @@ func (s *SpecList) getAptPackages(specName string) []string {
 	// The requested spec
 	spec := s.Specs[specName]
 	var packages []string
-	if spec == nil {
+	if spec == nil || spec.Packages.SkipPackages {
 		return nil
 	}
 
