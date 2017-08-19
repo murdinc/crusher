@@ -267,7 +267,9 @@ func (job *RemoteJob) Run() {
 		job.Responses <- fmt.Sprintf(line, "*", "Running Post-Configuration Command...")
 		err = job.runCommand(postCmd, "Post-Configuration")
 		if err != nil {
-			job.Errors <- fmt.Errorf(line, "X", "Post-Configuration Command Failed!")
+			job.Errors <- fmt.Errorf(line, "X", "Post-Configuration Command Failed! Aborting futher tasks for this server..")
+			job.Errors <- fmt.Errorf("Error: %s", err)
+			return
 		}
 		job.Responses <- fmt.Sprintf(line, "✓", "Post-Configuration Command Succeeded!")
 	}
