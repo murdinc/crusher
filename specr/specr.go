@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	gotree "github.com/DiSiqueira/GoTree"
 	"github.com/hashicorp/hil"
 	"github.com/hashicorp/hil/ast"
 	"github.com/murdinc/terminal"
@@ -58,10 +59,13 @@ type Commands struct {
 	Post     []string `ini:"post,omitempty"`
 	SkipPre  bool     `ini:"skip_pre"`
 	SkipPost bool     `ini:"skip_post"`
+	TailPre  bool     `ini:"tail_pre"`
+	TailPost bool     `ini:"tail_post"`
 }
 
 type SpecSummary struct {
 	Name      string
+	Requires  []string
 	PreCmds   []string
 	AptCmds   []string
 	Transfers *FileTransfers
@@ -175,6 +179,13 @@ func (s *SpecList) PreCmds(specName string) []string {
 	return s.getPreCommands(specName)
 }
 
+// Returns the requires
+func (s *SpecList) Requires(specName string) []string {
+	requires := s.getRequires(specName)
+	//gotree.PrintTree(requires)
+	return strings.Split(gotree.StringTree(requires), "\n")
+}
+
 // Returns the post-configure commands
 func (s *SpecList) PostCmds(specName string) []string {
 	return s.getPostCommands(specName)
@@ -265,6 +276,7 @@ func (s *SpecList) ShowSpecBuild(specName string) {
 
 	terminal.PrintAnsi(SpecBuildTemplate, SpecSummary{
 		Name:      specName,
+		Requires:  s.Requires(specName),
 		PreCmds:   s.PreCmds(specName),
 		AptCmds:   s.AptGetCmds(specName),
 		Transfers: s.DebianFileTransferList(specName),
@@ -274,6 +286,8 @@ func (s *SpecList) ShowSpecBuild(specName string) {
 
 var SpecBuildTemplate = `
 {{ansi ""}}{{ ansi "underscore"}}{{ ansi "bright" }}{{ ansi "fgwhite"}}[{{ .Name }}]{{ ansi ""}}
+	{{ ansi "bright"}}{{ ansi "fgwhite"}}                Requires: {{ ansi ""}}{{ ansi "fgcyan"}}{{ range .Requires }}{{ . }}
+				  {{ end }}{{ ansi ""}}
 	{{ ansi "bright"}}{{ ansi "fgwhite"}}  pre-configure Commands: {{ ansi ""}}{{ ansi "fgcyan"}}{{ range .PreCmds }}{{ . }}
 				  {{ end }}{{ ansi ""}}
 	{{ ansi "bright"}}{{ ansi "fgwhite"}}        apt-get Commands: {{ ansi ""}}{{ ansi "fgcyan"}}{{ range .AptCmds }}{{ . }}
@@ -602,6 +616,32 @@ func (s *SpecList) getPreCommands(specName string) []string {
 	}
 
 	return commands
+}
+
+func (s *SpecList) getRequires(specName string) gotree.GTStructure {
+	// The requested spec
+	spec := s.Specs[specName]
+	var requires gotree.GTStructure
+	requires.Name = specName
+
+	if spec == nil {
+		return requires
+	}
+
+	// gather all requires for this spec
+	for _, req := range spec.Requires {
+		if req != "" && req != "\"\"" {
+
+			var reqObj gotree.GTStructure
+			reqObj.Name = req
+
+			reqObj.Items = append(reqObj.Items, s.getRequires(req))
+
+			requires.Items = append(requires.Items, reqObj.Items...)
+		}
+	}
+
+	return requires
 }
 
 // Recursive unexported func for PostCmds
