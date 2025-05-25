@@ -28,10 +28,6 @@ To use this tool, you must have the ability to ssh to a host, have permission to
 - Distributed:
 compile **crusher** and put it at the base of a git repo containing your spec files. New servers can be launched with a script to check out your repo and run crushers `local-configure` command to configure themselves.
 
-## Installation
-```
-curl -s http://dl.sudoba.sh/get/crusher | sh
-```
 
 ## Commands
 The available commands can be printed by running `$ crusher` or `$ crusher --help`:
